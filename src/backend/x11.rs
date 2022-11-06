@@ -24,11 +24,33 @@ macro_rules! atoms {
 }
 
 atoms! {
-  wm_protocols:  b"WM_PROTOCOLS",
-  wm_del_window: b"WM_DELETE_WINDOW",
-  wm_state:      b"_NET_WM_STATE",
-  wm_state_maxv: b"_NET_WM_STATE_MAXIMIZED_VERT",
-  wm_state_maxh: b"_NET_WM_STATE_MAXIMIZED_HORZ",
+  wm_protocols:        b"WM_PROTOCOLS",
+  wm_del_window:       b"WM_DELETE_WINDOW",
+  wm_state:            b"_NET_WM_STATE",
+  wm_state_above:      b"_NET_WM_STATE_ABOVE",
+  wm_state_maxv:       b"_NET_WM_STATE_MAXIMIZED_VERT",
+  wm_state_maxh:       b"_NET_WM_STATE_MAXIMIZED_HORZ",
+  wm_state_sticky:     b"_NET_WM_STATE_STICKY",
+  wm_strut:            b"_NET_WM_STRUT",
+  wm_strut_partial:    b"_NET_WM_STRUT_PARTIAL",
+  wm_window_type:      b"_NET_WM_WINDOW_TYPE",
+  wm_window_type_dock: b"_NET_WM_WINDOW_TYPE_DOCK",
+}
+
+#[allow(unused)]
+enum Strut {
+  Left,
+  Right,
+  Top,
+  Bottom,
+  LeftStartY,
+  LeftEndY,
+  RightStartY,
+  RightEndY,
+  TopStartX,
+  TopEndX,
+  BottomStartX,
+  BottomEndX,
 }
 
 pub fn run() {
@@ -52,8 +74,8 @@ fn run_inner() -> xcb::Result<()> {
     parent:       screen.root(),
     x:            0,
     y:            0,
-    width:        150,
-    height:       150,
+    width:        1920,
+    height:       100,
     border_width: 0,
     class:        x::WindowClass::InputOutput,
     visual:       screen.root_visual(),
@@ -80,6 +102,47 @@ fn run_inner() -> xcb::Result<()> {
   conn.send_request(&x::MapWindow { window });
 
   let atoms = Atoms::setup(&conn)?;
+
+  let cookie = conn.send_request_checked(&x::ChangeProperty {
+    mode: x::PropMode::Replace,
+    window,
+    property: atoms.wm_window_type,
+    r#type: x::ATOM_ATOM,
+    data: &[atoms.wm_window_type_dock],
+  });
+  conn.check_request(cookie)?;
+
+  let cookie = conn.send_request_checked(&x::ChangeProperty {
+    mode: x::PropMode::Append,
+    window,
+    property: atoms.wm_state,
+    r#type: x::ATOM_ATOM,
+    data: &[atoms.wm_state_sticky],
+  });
+  conn.check_request(cookie)?;
+
+  let mut strut = [0_u32; 12];
+  strut[Strut::Top as usize] = 100;
+  strut[Strut::TopStartX as usize] = 0;
+  strut[Strut::TopEndX as usize] = 1920;
+
+  let cookie = conn.send_request_checked(&x::ChangeProperty {
+    mode: x::PropMode::Replace,
+    window,
+    property: atoms.wm_strut,
+    r#type: x::ATOM_CARDINAL,
+    data: &strut[..4],
+  });
+  conn.check_request(cookie)?;
+
+  let cookie = conn.send_request_checked(&x::ChangeProperty {
+    mode: x::PropMode::Replace,
+    window,
+    property: atoms.wm_strut_partial,
+    r#type: x::ATOM_CARDINAL,
+    data: &strut,
+  });
+  conn.check_request(cookie)?;
 
   // We now activate the window close event by sending the following request.
   // If we don't do this we can still close the window by clicking on the "x"
