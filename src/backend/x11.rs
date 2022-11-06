@@ -95,7 +95,7 @@ fn run_inner() -> xcb::Result<()> {
     window,
     property: x::ATOM_WM_NAME,
     r#type: x::ATOM_STRING,
-    data: b"My XCB Window",
+    data: b"Correct Bar",
   });
   conn.check_request(cookie)?;
 
