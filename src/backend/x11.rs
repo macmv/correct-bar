@@ -1,3 +1,4 @@
+use crate::config::WindowConfig;
 use xcb::{x, Xid};
 
 macro_rules! atoms {
@@ -53,14 +54,14 @@ enum Strut {
   BottomEndX,
 }
 
-pub fn run() {
-  match run_inner() {
+pub fn run(config: &WindowConfig) {
+  match run_inner(config) {
     Ok(()) => {}
     Err(e) => println!("{e}"),
   }
 }
 
-fn run_inner() -> xcb::Result<()> {
+fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
   let (conn, screen_num) = xcb::Connection::connect(None)?;
 
   let setup = conn.get_setup();
@@ -72,10 +73,10 @@ fn run_inner() -> xcb::Result<()> {
     depth:        x::COPY_FROM_PARENT as u8,
     wid:          window,
     parent:       screen.root(),
-    x:            0,
-    y:            0,
-    width:        1920,
-    height:       100,
+    x:            config.margin_left as i16,
+    y:            config.margin_top as i16,
+    width:        config.width as u16,
+    height:       config.height as u16,
     border_width: 0,
     class:        x::WindowClass::InputOutput,
     visual:       screen.root_visual(),
@@ -122,9 +123,9 @@ fn run_inner() -> xcb::Result<()> {
   conn.check_request(cookie)?;
 
   let mut strut = [0_u32; 12];
-  strut[Strut::Top as usize] = 100;
-  strut[Strut::TopStartX as usize] = 0;
-  strut[Strut::TopEndX as usize] = 1920;
+  strut[Strut::Top as usize] = config.margin_top + config.height + config.margin_bottom;
+  strut[Strut::TopStartX as usize] = config.margin_left;
+  strut[Strut::TopEndX as usize] = config.width - config.margin_right;
 
   let cookie = conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Replace,
