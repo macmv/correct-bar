@@ -59,7 +59,7 @@ fn run_inner() -> xcb::Result<()> {
     visual:       screen.root_visual(),
     // this list must be in same order than `Cw` enum order
     value_list:   &[
-      x::Cw::BackPixel(screen.white_pixel()),
+      x::Cw::BackPixel(0x222222),
       x::Cw::EventMask(x::EventMask::EXPOSURE | x::EventMask::KEY_PRESS),
     ],
   });
