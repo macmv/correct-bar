@@ -1,6 +1,6 @@
 use correct_bar::{
   config::{Config, WindowConfig},
-  module::Module,
+  module::{Module, Section},
 };
 
 fn main() {
@@ -14,7 +14,10 @@ fn main() {
       height: 50,
       ..Default::default()
     },
-    modules_left: vec![Module::from(|| "@").with_color(0x3300ff), Module::from(|| "|")],
+    modules_left: vec![
+      Module::constant(&[Section::new("foo").with_color(0x333333)]),
+      Module::constant(&[Section::new("|")]),
+    ],
     ..Default::default()
   };
   correct_bar::run(config)
