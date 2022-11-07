@@ -1,4 +1,4 @@
-use crate::Module;
+use crate::module::Module;
 
 #[derive(Default)]
 pub struct Config {

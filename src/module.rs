@@ -28,10 +28,11 @@ pub trait ModuleImpl {
   fn updater(&self) -> Updater;
 }
 
-impl<F> ModuleImpl for F
+impl<F, R> ModuleImpl for F
 where
-  F: FnMut() -> String,
+  F: FnMut() -> R,
+  R: Into<String>,
 {
-  fn render(&mut self) -> String { self() }
+  fn render(&mut self) -> String { self().into() }
   fn updater(&self) -> Updater { Updater::Never }
 }
