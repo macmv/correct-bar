@@ -1,7 +1,9 @@
 mod backend;
 mod config;
+mod module;
 
 pub use config::Config;
+pub use module::Module;
 
 pub fn run() {
   let config = Config {

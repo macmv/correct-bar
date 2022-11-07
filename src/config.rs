@@ -1,6 +1,12 @@
+use crate::Module;
+
 #[derive(Default)]
 pub struct Config {
   pub window: WindowConfig,
+
+  pub modules_left:   Vec<Module>,
+  pub modules_middle: Vec<Module>,
+  pub modules_right:  Vec<Module>,
 }
 
 #[derive(Default)]
