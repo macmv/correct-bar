@@ -100,18 +100,17 @@ fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
   });
   conn.check_request(cookie)?;
 
-  conn.send_request(&x::MapWindow { window });
-
   let atoms = Atoms::setup(&conn)?;
 
-  let cookie = conn.send_request_checked(&x::ChangeProperty {
+  // Need to send these requests before mapping the window!
+
+  conn.check_request(conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Replace,
     window,
     property: atoms.wm_window_type,
     r#type: x::ATOM_ATOM,
     data: &[atoms.wm_window_type_dock],
-  });
-  conn.check_request(cookie)?;
+  }))?;
 
   let cookie = conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Append,
@@ -144,6 +143,8 @@ fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
     data: &strut,
   });
   conn.check_request(cookie)?;
+
+  conn.send_request(&x::MapWindow { window });
 
   // We now activate the window close event by sending the following request.
   // If we don't do this we can still close the window by clicking on the "x"
