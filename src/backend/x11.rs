@@ -118,7 +118,7 @@ fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
     window,
     property: atoms.wm_state,
     r#type: x::ATOM_ATOM,
-    data: &[atoms.wm_state_sticky],
+    data: &[atoms.wm_state_above, atoms.wm_state_sticky],
   });
   conn.check_request(cookie)?;
 
