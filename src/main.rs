@@ -1,24 +1,10 @@
-use correct_bar::{
-  config::{Config, WindowConfig},
-  module::{Module, Section},
-};
+mod preset;
 
 fn main() {
-  let config = Config {
-    window: WindowConfig {
-      margin_top: 40,
-      margin_left: 10,
-      margin_right: 10,
-      margin_bottom: 10,
-      width: 1920 - 20,
-      height: 50,
-      ..Default::default()
-    },
-    modules_left: vec![
-      Module::constant(&[Section::new("foo").with_color(0x333333)]),
-      Module::constant(&[Section::new("|")]),
-    ],
-    ..Default::default()
-  };
-  correct_bar::run(config)
+  match std::env::args().nth(1).as_ref().map(|s| s.as_str()) {
+    Some("desktop") => preset::desktop::run(),
+    Some("laptop") => preset::laptop::run(),
+    Some(preset) => eprintln!("invalid preset `{preset}`"),
+    None => eprintln!("choose a preset"),
+  }
 }
