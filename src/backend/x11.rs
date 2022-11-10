@@ -66,6 +66,8 @@ fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
 
   let setup = conn.get_setup();
   let screen = setup.roots().nth(screen_num as usize).unwrap();
+  let colormap = screen.default_colormap();
+  let depth = screen.root_depth();
 
   let window = conn.generate_id();
 
@@ -160,6 +162,25 @@ fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
   // Previous request was checked, so a flush is not necessary in this case.
   // Otherwise, here is how to perform a connection flush.
   conn.flush()?;
+
+  let pixmap = conn.generate_id();
+  conn.check_request(conn.send_request_checked(&x::CreatePixmap {
+    drawable: x::Drawable::Window(window),
+    pid: pixmap,
+    height: config.height as u16,
+    width: config.width as u16,
+    depth,
+  }))?;
+
+  let gc = conn.generate_id();
+  conn.check_request(conn.send_request_checked(&x::CreateGc {
+    drawable:   x::Drawable::Pixmap(pixmap),
+    cid:        gc,
+    value_list: &[],
+  }))?;
+
+  let image =
+    conn.send_request_checked(&xcb::xv::PutImage { data, drawable: x::Drawable::Pixmap(pixmap) });
 
   let mut maximized = false;
 
