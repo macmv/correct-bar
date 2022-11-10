@@ -1,4 +1,5 @@
 mod backend;
+pub mod bar;
 pub mod config;
 pub mod module;
 
