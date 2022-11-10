@@ -180,7 +180,17 @@ fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
   }))?;
 
   assert_eq!(depth, 24);
-  let data = [0; 100 * 100 * 4];
+  let mut data = [0; 100 * 100 * 4];
+
+  for x in 20..40 {
+    for y in 20..40 {
+      let i = (y * 100 + x) * 4;
+      data[i + 0] = 0;
+      data[i + 1] = 255;
+      data[i + 2] = 128;
+      data[i + 3] = 0;
+    }
+  }
 
   conn.check_request(conn.send_request_checked(&xcb::x::PutImage {
     data: &data,
@@ -200,6 +210,20 @@ fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
   // We enter the main event loop
   loop {
     match conn.wait_for_event()? {
+      xcb::Event::X(x::Event::Expose(_)) => {
+        println!("Got an expose!");
+        conn.check_request(conn.send_request_checked(&xcb::x::CopyArea {
+          dst_drawable: x::Drawable::Window(window),
+          dst_x: 0,
+          dst_y: 0,
+          gc,
+          src_drawable: x::Drawable::Pixmap(pixmap),
+          src_x: 0,
+          src_y: 0,
+          width: 100,
+          height: 100,
+        }))?;
+      }
       xcb::Event::X(x::Event::KeyPress(ev)) => {
         if ev.detail() == 0x3a {
           // The M key was pressed
