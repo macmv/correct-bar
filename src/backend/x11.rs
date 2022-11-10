@@ -179,8 +179,21 @@ fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
     value_list: &[],
   }))?;
 
-  let image =
-    conn.send_request_checked(&xcb::xv::PutImage { data, drawable: x::Drawable::Pixmap(pixmap) });
+  assert_eq!(depth, 24);
+  let data = [0; 100 * 100 * 4];
+
+  conn.check_request(conn.send_request_checked(&xcb::x::PutImage {
+    data: &data,
+    gc,
+    drawable: x::Drawable::Pixmap(pixmap),
+    depth,
+    width: 100,
+    height: 100,
+    dst_x: 0,
+    dst_y: 0,
+    format: xcb::x::ImageFormat::ZPixmap,
+    left_pad: 0,
+  }))?;
 
   let mut maximized = false;
 
