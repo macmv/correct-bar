@@ -18,9 +18,19 @@ pub struct Bar {
 }
 
 pub struct Modules {
-  left:   Vec<Module>,
-  middle: Vec<Module>,
-  right:  Vec<Module>,
+  left:   Vec<PositionedModule>,
+  middle: Vec<PositionedModule>,
+  right:  Vec<PositionedModule>,
+}
+
+struct PositionedModule {
+  module: Module,
+  pos:    u32,
+  width:  u32,
+}
+
+impl From<Module> for PositionedModule {
+  fn from(module: Module) -> Self { PositionedModule { module, pos: 0, width: 0 } }
 }
 
 pub trait Backend {
@@ -50,35 +60,91 @@ impl Bar {
 
   pub fn all_modules(&self) -> impl Iterator<Item = (ModuleKey, &Module)> { self.modules.iter() }
   pub fn update_module(&mut self, key: ModuleKey) {
-    let module = self.modules.by_key(key);
-    let mut ctx = RenderContext::new(&mut self.window, Pos { x: module.pos(), y: 20 });
-    module.imp().render(&mut ctx);
+    dbg!(key);
+    let module = self.modules.by_key_mut(key);
+    let mut ctx = RenderContext::new(&mut self.window, Pos { x: module.pos, y: 20 });
+    module.module.imp().render(&mut ctx);
+    if ctx.width != module.width {
+      module.width = ctx.width;
+      self.resize_from(key);
+    }
+  }
+
+  fn resize_from(&mut self, key: ModuleKey) {
+    match key {
+      ModuleKey::Left(idx) => {
+        let mut pos = self.modules.left[idx as usize].pos;
+        for module in self.modules.left.iter_mut().skip(idx as usize) {
+          pos += module.reposition(pos);
+        }
+      }
+      ModuleKey::Middle(_) => {
+        let mut width = 0;
+        for module in self.modules.middle.iter() {
+          width += module.width;
+        }
+        let mut pos = self.window.width() / 2 - width / 2;
+        for module in self.modules.middle.iter_mut() {
+          pos += module.reposition(pos);
+        }
+      }
+      ModuleKey::Right(idx) => {
+        let mut pos = self.modules.left[idx as usize].pos;
+        for module in self.modules.left.iter_mut().skip(idx as usize).rev() {
+          pos -= module.reposition(pos);
+        }
+      }
+    }
   }
 }
 
 impl Modules {
   pub fn empty() -> Self { Modules { left: vec![], middle: vec![], right: vec![] } }
   pub fn set_from_config(&mut self, config: crate::Config) {
-    self.left = config.modules_left;
-    self.middle = config.modules_middle;
-    self.right = config.modules_right;
+    self.left = config.modules_left.into_iter().map(Into::into).collect();
+    self.middle = config.modules_middle.into_iter().map(Into::into).collect();
+    self.right = config.modules_right.into_iter().map(Into::into).collect();
   }
   pub fn iter(&self) -> impl Iterator<Item = (ModuleKey, &Module)> {
     self
       .left
       .iter()
       .enumerate()
-      .map(|(i, module)| (ModuleKey::Left(i as u32), module))
+      .map(|(i, module)| (ModuleKey::Left(i as u32), &module.module))
       .chain(
-        self.middle.iter().enumerate().map(|(i, module)| (ModuleKey::Middle(i as u32), module)),
+        self
+          .middle
+          .iter()
+          .enumerate()
+          .map(|(i, module)| (ModuleKey::Middle(i as u32), &module.module)),
       )
-      .chain(self.right.iter().enumerate().map(|(i, module)| (ModuleKey::Right(i as u32), module)))
+      .chain(
+        self
+          .right
+          .iter()
+          .enumerate()
+          .map(|(i, module)| (ModuleKey::Right(i as u32), &module.module)),
+      )
   }
-  pub fn by_key(&self, key: ModuleKey) -> &Module {
+  fn by_key(&self, key: ModuleKey) -> &PositionedModule {
     match key {
       ModuleKey::Left(i) => &self.left[i as usize],
       ModuleKey::Middle(i) => &self.middle[i as usize],
       ModuleKey::Right(i) => &self.right[i as usize],
     }
+  }
+  fn by_key_mut(&mut self, key: ModuleKey) -> &mut PositionedModule {
+    match key {
+      ModuleKey::Left(i) => &mut self.left[i as usize],
+      ModuleKey::Middle(i) => &mut self.middle[i as usize],
+      ModuleKey::Right(i) => &mut self.right[i as usize],
+    }
+  }
+}
+
+impl PositionedModule {
+  pub fn reposition(&mut self, pos: u32) -> u32 {
+    self.pos = pos;
+    self.width
   }
 }

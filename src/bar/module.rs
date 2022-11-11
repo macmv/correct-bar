@@ -3,8 +3,7 @@ use crossbeam_channel::Receiver;
 use std::time::Duration;
 
 pub struct Module {
-  imp:            Box<dyn ModuleImpl + Send + Sync>,
-  pub(super) pos: u32,
+  imp: Box<dyn ModuleImpl + Send + Sync>,
 }
 
 impl Module {
@@ -23,15 +22,13 @@ impl Module {
 
     Module::from(TextModule { text, color })
   }
-
-  pub fn pos(&self) -> u32 { self.pos }
 }
 
 impl<T> From<T> for Module
 where
   T: ModuleImpl + Send + Sync + 'static,
 {
-  fn from(imp: T) -> Self { Module { imp: Box::new(imp), pos: 0 } }
+  fn from(imp: T) -> Self { Module { imp: Box::new(imp) } }
 }
 
 pub enum Updater {

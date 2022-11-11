@@ -40,6 +40,8 @@ impl Window {
   pub fn data(&self) -> &[u8] { &self.buf.data }
 
   pub fn draw_text(&mut self, pos: Pos, text: &str, color: Color) -> Rect {
+    let mut width = 0;
+    let mut height = 0;
     let layout = self.font.font.layout(text, Scale::uniform(48.0), Point { x: 0.0, y: 0.0 });
     for glyph in layout {
       let bounds = glyph.pixel_bounding_box().unwrap();
@@ -47,10 +49,16 @@ impl Window {
         x: (pos.x as i32 + bounds.min.x) as u32,
         y: (pos.y as i32 + bounds.min.y + 20) as u32,
       };
+      if bounds.max.x - pos.x as i32 > width {
+        width = bounds.max.x - pos.x as i32;
+      }
+      if bounds.max.y - pos.y as i32 > height {
+        height = bounds.max.y - pos.y as i32;
+      }
       let buf = self.font.cache.render(glyph.unpositioned());
       self.buf.copy_from_alpha(base, color, buf);
     }
-    Rect { pos, width: 0, height: 0 }
+    Rect { pos, width: width as u32, height: height as u32 }
   }
 
   pub fn draw_rect(&mut self, rect: Rect, color: Color) { self.buf.draw_rect(rect, color); }
