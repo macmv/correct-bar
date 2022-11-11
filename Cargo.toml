@@ -10,4 +10,5 @@ edition = "2021"
 [dependencies]
 crossbeam-channel = "0.5.6"
 parking_lot = "0.12.1"
+rusttype = "0.9.3"
 xcb = "1.2.0"
