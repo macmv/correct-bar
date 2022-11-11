@@ -106,8 +106,8 @@ impl Backend for X11Backend {
         src_drawable: x::Drawable::Pixmap(self.pixmap),
         src_x:        0,
         src_y:        0,
-        width:        100,
-        height:       100,
+        width:        window.width() as u16,
+        height:       window.height() as u16,
       })
       .unwrap();
   }
@@ -242,17 +242,6 @@ fn setup_inner(config: &WindowConfig) -> xcb::Result<Arc<Mutex<Bar>>> {
   }))?;
 
   assert_eq!(depth, 24);
-  let mut data = [0; 100 * 100 * 4];
-
-  for x in 20..40 {
-    for y in 20..40 {
-      let i = (y * 100 + x) * 4;
-      data[i + 0] = 0;
-      data[i + 1] = 255;
-      data[i + 2] = 128;
-      data[i + 3] = 0;
-    }
-  }
 
   let mut maximized = false;
 
