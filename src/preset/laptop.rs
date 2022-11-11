@@ -1,9 +1,7 @@
-use correct_bar::{
-  config::{Config, WindowConfig},
-  module::{Module, Section},
-};
+use correct_bar::config::{Config, WindowConfig};
 
 pub fn run() {
+  let (modules_left, modules_middle, modules_right) = super::modules();
   let config = Config {
     window: WindowConfig {
       margin_top: 40,
@@ -14,10 +12,9 @@ pub fn run() {
       height: 50,
       ..Default::default()
     },
-    modules_left: vec![
-      Module::constant(&[Section::new("foo").with_color(0x333333)]),
-      Module::constant(&[Section::new("|")]),
-    ],
+    modules_left,
+    modules_middle,
+    modules_right,
     ..Default::default()
   };
   correct_bar::run(config)

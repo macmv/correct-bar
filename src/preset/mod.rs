@@ -1,13 +1,13 @@
 pub mod desktop;
 pub mod laptop;
 
-use correct_bar::module::{Module, Section};
+use correct_bar::module::Module;
 
 pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
   (
     vec![
-      Module::constant(&[Section::new("foo").with_color(0x333333)]),
-      Module::constant(&[Section::new("|")]),
+      Module::text("foo", correct_bar::bar::Color { r: 255, g: 255, b: 255 }),
+      Module::text("|", correct_bar::bar::Color { r: 100, g: 100, b: 100 }),
     ],
     vec![],
     vec![],

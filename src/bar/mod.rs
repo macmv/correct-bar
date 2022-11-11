@@ -1,5 +1,7 @@
+mod ctx;
 mod window;
 
+pub use ctx::RenderContext;
 pub use window::Window;
 
 use crate::module::Module;
@@ -70,7 +72,8 @@ impl Bar {
   }
   pub fn update_module(&self, key: ModuleKey) {
     let module = self.module(key);
-    module.imp().render();
+    let mut ctx = RenderContext::new(self.window(), module);
+    module.imp().render(&mut ctx);
   }
   pub fn module(&self, key: ModuleKey) -> &Module {
     match key {
