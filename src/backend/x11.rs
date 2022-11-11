@@ -1,4 +1,6 @@
-use crate::config::WindowConfig;
+use crate::{bar::Bar, config::WindowConfig};
+use parking_lot::Mutex;
+use std::{sync::Arc, thread};
 use xcb::{x, Xid};
 
 macro_rules! atoms {
@@ -54,19 +56,22 @@ enum Strut {
   BottomEndX,
 }
 
-pub fn run(config: &WindowConfig) {
+pub fn run(config: &WindowConfig) -> Arc<Mutex<Bar>> {
   match run_inner(config) {
-    Ok(()) => {}
-    Err(e) => println!("{e}"),
+    Ok(bar) => bar,
+    Err(e) => {
+      println!("{e}");
+      std::process::exit(1);
+    }
   }
 }
 
-fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
+fn run_inner(config: &WindowConfig) -> xcb::Result<Arc<Mutex<Bar>>> {
   let (conn, screen_num) = xcb::Connection::connect(None)?;
 
   let setup = conn.get_setup();
-  let screen = setup.roots().nth(screen_num as usize).unwrap();
-  let colormap = screen.default_colormap();
+  let screen = setup.roots().nth(screen_num as usize).unwrap().clone();
+  let root = screen.root();
   let depth = screen.root_depth();
 
   let window = conn.generate_id();
@@ -192,85 +197,97 @@ fn run_inner(config: &WindowConfig) -> xcb::Result<()> {
     }
   }
 
-  conn.check_request(conn.send_request_checked(&xcb::x::PutImage {
-    data: &data,
-    gc,
-    drawable: x::Drawable::Pixmap(pixmap),
-    depth,
-    width: 100,
-    height: 100,
-    dst_x: 0,
-    dst_y: 0,
-    format: xcb::x::ImageFormat::ZPixmap,
-    left_pad: 0,
-  }))?;
-
   let mut maximized = false;
 
+  let conn = Arc::new(conn);
+  let c2 = conn.clone();
+  let bar = Arc::new(Mutex::new(Bar::new(config.width, config.height, move |buf| {
+    c2.check_request(c2.send_request_checked(&xcb::x::PutImage {
+      data: buf,
+      gc,
+      drawable: x::Drawable::Pixmap(pixmap),
+      depth,
+      width: 100,
+      height: 100,
+      dst_x: 0,
+      dst_y: 0,
+      format: xcb::x::ImageFormat::ZPixmap,
+      left_pad: 0,
+    }))
+    .unwrap();
+
+    c2.check_request(c2.send_request_checked(&xcb::x::CopyArea {
+      dst_drawable: x::Drawable::Window(window),
+      dst_x: 0,
+      dst_y: 0,
+      gc,
+      src_drawable: x::Drawable::Pixmap(pixmap),
+      src_x: 0,
+      src_y: 0,
+      width: 100,
+      height: 100,
+    }))
+    .unwrap();
+  })));
+
   // We enter the main event loop
-  loop {
-    match conn.wait_for_event()? {
-      xcb::Event::X(x::Event::Expose(_)) => {
-        println!("Got an expose!");
-        conn.check_request(conn.send_request_checked(&xcb::x::CopyArea {
-          dst_drawable: x::Drawable::Window(window),
-          dst_x: 0,
-          dst_y: 0,
-          gc,
-          src_drawable: x::Drawable::Pixmap(pixmap),
-          src_x: 0,
-          src_y: 0,
-          width: 100,
-          height: 100,
-        }))?;
-      }
-      xcb::Event::X(x::Event::KeyPress(ev)) => {
-        if ev.detail() == 0x3a {
-          // The M key was pressed
-          // (M only on qwerty keyboards. Keymap support is done
-          // with the `xkb` extension and the `xkbcommon-rs` crate)
-
-          // We toggle maximized state, for this we send a message
-          // by building a `x::ClientMessageEvent` with the proper
-          // atoms and send it to the server.
-
-          let data = x::ClientMessageData::Data32([
-            if maximized { 0 } else { 1 },
-            atoms.wm_state_maxv.resource_id(),
-            atoms.wm_state_maxh.resource_id(),
-            0,
-            0,
-          ]);
-          let event = x::ClientMessageEvent::new(window, atoms.wm_state, data);
-          let cookie = conn.send_request_checked(&x::SendEvent {
-            propagate:   false,
-            destination: x::SendEventDest::Window(screen.root()),
-            event_mask:  x::EventMask::STRUCTURE_NOTIFY,
-            event:       &event,
-          });
-          conn.check_request(cookie)?;
-
-          // Same as before, if we don't check for error, we have to flush
-          // the connection.
-          // conn.flush()?;
-
-          maximized = !maximized;
-        } else if ev.detail() == 0x18 {
-          // Q (on qwerty)
-
-          // We exit the event loop (and the program)
-          break Ok(());
+  let b2 = bar.clone();
+  thread::spawn(move || {
+    loop {
+      match conn.wait_for_event().unwrap() {
+        xcb::Event::X(x::Event::Expose(_)) => {
+          b2.lock().render();
+          println!("Got an expose!");
         }
-      }
-      xcb::Event::X(x::Event::ClientMessage(ev)) => {
-        // We have received a message from the server
-        if let x::ClientMessageData::Data32([atom, ..]) = ev.data() {
-          if atom == atoms.wm_del_window.resource_id() {
-            break Ok(());
+        xcb::Event::X(x::Event::KeyPress(ev)) => {
+          if ev.detail() == 0x3a {
+            // The M key was pressed
+            // (M only on qwerty keyboards. Keymap support is done
+            // with the `xkb` extension and the `xkbcommon-rs` crate)
+
+            // We toggle maximized state, for this we send a message
+            // by building a `x::ClientMessageEvent` with the proper
+            // atoms and send it to the server.
+
+            let data = x::ClientMessageData::Data32([
+              if maximized { 0 } else { 1 },
+              atoms.wm_state_maxv.resource_id(),
+              atoms.wm_state_maxh.resource_id(),
+              0,
+              0,
+            ]);
+            let event = x::ClientMessageEvent::new(window, atoms.wm_state, data);
+            let cookie = conn.send_request_checked(&x::SendEvent {
+              propagate:   false,
+              destination: x::SendEventDest::Window(root),
+              event_mask:  x::EventMask::STRUCTURE_NOTIFY,
+              event:       &event,
+            });
+            conn.check_request(cookie).unwrap();
+
+            // Same as before, if we don't check for error, we have to flush
+            // the connection.
+            // conn.flush()?;
+
+            maximized = !maximized;
+          } else if ev.detail() == 0x18 {
+            // Q (on qwerty)
+
+            // We exit the event loop (and the program)
+            break;
           }
         }
+        xcb::Event::X(x::Event::ClientMessage(ev)) => {
+          // We have received a message from the server
+          if let x::ClientMessageData::Data32([atom, ..]) = ev.data() {
+            if atom == atoms.wm_del_window.resource_id() {
+              break;
+            }
+          }
+        }
+        _ => {}
       }
-      _ => {}
     }
-  }
+  });
+  Ok(bar)
 }
