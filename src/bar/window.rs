@@ -31,17 +31,13 @@ impl Window {
     for glyph in layout {
       println!("{:?}", glyph);
       let bounds = glyph.pixel_bounding_box().unwrap();
-      self.buf.draw_rect(
-        Rect {
-          pos:    Pos {
-            x: (bounds.min.x + pos.x as i32).try_into().unwrap(),
-            y: (bounds.min.y + pos.y as i32).try_into().unwrap(),
-          },
-          width:  bounds.width().try_into().unwrap(),
-          height: bounds.height().try_into().unwrap(),
-        },
-        color,
-      );
+      let base =
+        Pos { x: (pos.x as i32 + bounds.min.x) as u32, y: (pos.y as i32 + bounds.min.y) as u32 };
+      glyph.draw(|x, y, coverage| {
+        if coverage > 0.0 {
+          self.buf.draw_pixel_alpha(base + Pos { x, y }, color, (coverage * 255.0) as u8);
+        }
+      });
     }
     Rect { pos, width: 0, height: 0 }
   }
@@ -66,6 +62,24 @@ impl WindowBuf {
       self.data[i] = color.r;
       self.data[i + 1] = color.g;
       self.data[i + 2] = color.b;
+    }
+  }
+
+  pub fn get_pixel(&mut self, pos: Pos) -> Color {
+    if pos.x < self.width && pos.y < self.height {
+      let i = (pos.y * self.width + pos.x) as usize * 4;
+      Color { r: self.data[i], g: self.data[i + 1], b: self.data[i + 2] }
+    } else {
+      Color::black()
+    }
+  }
+
+  pub fn draw_pixel_alpha(&mut self, pos: Pos, color: Color, alpha: u8) {
+    if alpha == 255 {
+      self.draw_pixel(pos, color);
+    } else {
+      let existing = self.get_pixel(pos);
+      self.draw_pixel(pos, color.fade(existing, alpha));
     }
   }
 }

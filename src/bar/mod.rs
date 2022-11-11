@@ -1,8 +1,10 @@
+mod color;
 mod ctx;
 mod math;
 mod module;
 mod window;
 
+pub use color::Color;
 pub use ctx::RenderContext;
 pub use math::{Pos, Rect};
 pub use module::{Module, Updater};
@@ -19,13 +21,6 @@ pub struct Modules {
   left:   Vec<Module>,
   middle: Vec<Module>,
   right:  Vec<Module>,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct Color {
-  pub r: u8,
-  pub g: u8,
-  pub b: u8,
 }
 
 pub trait Backend {
