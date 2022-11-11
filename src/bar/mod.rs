@@ -4,7 +4,7 @@ mod module;
 mod window;
 
 pub use ctx::RenderContext;
-pub use math::Pos;
+pub use math::{Pos, Rect};
 pub use module::{Module, Updater};
 pub use window::Window;
 

@@ -1,4 +1,4 @@
-use super::{Color, Pos};
+use super::{Color, Pos, Rect};
 
 pub struct Window {
   data:   Vec<u8>,
@@ -14,9 +14,9 @@ impl Window {
   pub fn height(&self) -> u32 { self.height }
   pub fn data(&self) -> &[u8] { &self.data }
 
-  pub fn draw_rect(&mut self, pos: Pos, width: u32, height: u32, color: Color) {
-    for x in pos.x..pos.x + width {
-      for y in pos.y..pos.y + height {
+  pub fn draw_rect(&mut self, rect: Rect, color: Color) {
+    for x in rect.left()..rect.right() {
+      for y in rect.top()..rect.bottom() {
         self.draw_pixel(Pos { x, y }, color);
       }
     }
