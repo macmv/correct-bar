@@ -1,15 +1,18 @@
 use super::{Color, Pos, Rect};
-use rusttype::{Font, Point, Scale};
+use rusttype::{Font, GlyphId, Point, Scale, ScaledGlyph};
 use std::collections::HashMap;
 
 pub struct Window {
   buf:  Buffer,
-  font: FontCache,
+  font: FontWithCache,
 }
 
+struct FontWithCache {
+  font:  Font<'static>,
+  cache: FontCache,
+}
 struct FontCache {
-  font:   Font<'static>,
-  glyphs: HashMap<u32, Buffer>,
+  glyphs: HashMap<GlyphId, Buffer>,
 }
 
 struct Buffer {
@@ -24,7 +27,7 @@ impl Window {
     // std::fs::read("/usr/share/fonts/TTF/icomoon-feather.ttf").unwrap();
     Window {
       buf:  Buffer::new(width, height),
-      font: FontCache::load("/usr/share/fonts/TTF/iosevka-regular.ttc"),
+      font: FontWithCache::load("/usr/share/fonts/TTF/iosevka-regular.ttc"),
     }
   }
   pub fn width(&self) -> u32 { self.buf.width }
@@ -39,11 +42,8 @@ impl Window {
         x: (pos.x as i32 + bounds.min.x) as u32,
         y: (pos.y as i32 + bounds.min.y + 20) as u32,
       };
-      glyph.draw(|x, y, coverage| {
-        if coverage > 0.0 {
-          self.buf.draw_pixel_alpha(base + Pos { x, y }, color, (coverage * 255.0) as u8);
-        }
-      });
+      let buf = self.font.cache.render(glyph.unpositioned());
+      self.buf.copy_from(base, buf);
     }
     Rect { pos, width: 0, height: 0 }
   }
@@ -52,16 +52,43 @@ impl Window {
   pub fn draw_pixel(&mut self, pos: Pos, color: Color) { self.buf.draw_pixel(pos, color); }
 }
 
-impl FontCache {
+impl FontWithCache {
   pub fn load(path: &str) -> Self {
     let font = std::fs::read(path).unwrap();
-    FontCache { font: Font::try_from_vec(font).unwrap(), glyphs: HashMap::new() }
+    FontWithCache { font: Font::try_from_vec(font).unwrap(), cache: FontCache::new() }
+  }
+}
+
+impl FontCache {
+  pub fn new() -> Self { FontCache { glyphs: HashMap::new() } }
+
+  pub fn render(&mut self, glyph: &ScaledGlyph) -> &Buffer {
+    if !self.glyphs.contains_key(&glyph.id()) {
+      let bounds = glyph.exact_bounding_box().unwrap();
+      let mut buf = Buffer::new(bounds.width().ceil() as u32, bounds.height().ceil() as u32);
+      glyph.clone().positioned(Point { x: 0.0, y: 0.0 }).draw(|x, y, coverage| {
+        if coverage > 0.0 {
+          buf.draw_pixel_alpha(Pos { x, y }, Color::white(), (coverage * 255.0) as u8);
+        }
+      });
+      self.glyphs.insert(glyph.id(), buf);
+    }
+    self.glyphs.get(&glyph.id()).unwrap()
   }
 }
 
 impl Buffer {
   pub fn new(width: u32, height: u32) -> Self {
     Buffer { data: vec![0; (width * height * 4) as usize], width, height }
+  }
+
+  pub fn copy_from(&mut self, pos: Pos, other: &Buffer) {
+    for x in 0..other.width {
+      for y in 0..other.height {
+        let p = Pos { x, y };
+        self.draw_pixel(p + pos, other.get_pixel(p));
+      }
+    }
   }
 
   pub fn draw_rect(&mut self, rect: Rect, color: Color) {
@@ -82,7 +109,7 @@ impl Buffer {
     }
   }
 
-  pub fn get_pixel(&mut self, pos: Pos) -> Color {
+  pub fn get_pixel(&self, pos: Pos) -> Color {
     if pos.x < self.width && pos.y < self.height {
       let i = (pos.y * self.width + pos.x) as usize * 4;
       Color { r: self.data[i], g: self.data[i + 1], b: self.data[i + 2] }
