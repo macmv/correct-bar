@@ -12,9 +12,14 @@ struct FontWithCache {
   cache: FontCache,
 }
 struct FontCache {
-  glyphs: HashMap<GlyphId, Buffer>,
+  glyphs: HashMap<GlyphId, AlphaBuffer>,
 }
 
+struct AlphaBuffer {
+  data:   Vec<u8>,
+  width:  u32,
+  height: u32,
+}
 struct Buffer {
   data:   Vec<u8>,
   width:  u32,
@@ -43,7 +48,7 @@ impl Window {
         y: (pos.y as i32 + bounds.min.y + 20) as u32,
       };
       let buf = self.font.cache.render(glyph.unpositioned());
-      self.buf.copy_from(base, buf);
+      self.buf.copy_from_alpha(base, color, buf);
     }
     Rect { pos, width: 0, height: 0 }
   }
@@ -62,18 +67,40 @@ impl FontWithCache {
 impl FontCache {
   pub fn new() -> Self { FontCache { glyphs: HashMap::new() } }
 
-  pub fn render(&mut self, glyph: &ScaledGlyph) -> &Buffer {
+  pub fn render(&mut self, glyph: &ScaledGlyph) -> &AlphaBuffer {
     if !self.glyphs.contains_key(&glyph.id()) {
       let bounds = glyph.exact_bounding_box().unwrap();
-      let mut buf = Buffer::new(bounds.width().ceil() as u32, bounds.height().ceil() as u32);
+      let mut buf = AlphaBuffer::new(bounds.width().ceil() as u32, bounds.height().ceil() as u32);
       glyph.clone().positioned(Point { x: 0.0, y: 0.0 }).draw(|x, y, coverage| {
         if coverage > 0.0 {
-          buf.draw_pixel_alpha(Pos { x, y }, Color::white(), (coverage * 255.0) as u8);
+          buf.draw_pixel(Pos { x, y }, (coverage * 255.0) as u8);
         }
       });
       self.glyphs.insert(glyph.id(), buf);
     }
     self.glyphs.get(&glyph.id()).unwrap()
+  }
+}
+
+impl AlphaBuffer {
+  pub fn new(width: u32, height: u32) -> Self {
+    AlphaBuffer { data: vec![0; (width * height) as usize], width, height }
+  }
+
+  pub fn draw_pixel(&mut self, pos: Pos, alpha: u8) {
+    if pos.x < self.width && pos.y < self.height {
+      let i = (pos.y * self.width + pos.x) as usize;
+      self.data[i] = alpha;
+    }
+  }
+
+  pub fn get_pixel(&self, pos: Pos) -> u8 {
+    if pos.x < self.width && pos.y < self.height {
+      let i = (pos.y * self.width + pos.x) as usize;
+      self.data[i]
+    } else {
+      0
+    }
   }
 }
 
@@ -87,6 +114,15 @@ impl Buffer {
       for y in 0..other.height {
         let p = Pos { x, y };
         self.draw_pixel(p + pos, other.get_pixel(p));
+      }
+    }
+  }
+  pub fn copy_from_alpha(&mut self, pos: Pos, color: Color, other: &AlphaBuffer) {
+    for x in 0..other.width {
+      for y in 0..other.height {
+        let p = Pos { x, y };
+        let alpha = other.get_pixel(p);
+        self.draw_pixel(p + pos, color.fade(self.get_pixel(p + pos), alpha));
       }
     }
   }
