@@ -1,10 +1,10 @@
 mod ctx;
+mod module;
 mod window;
 
 pub use ctx::RenderContext;
+pub use module::{Module, Updater};
 pub use window::Window;
-
-use crate::module::Module;
 
 pub struct Bar {
   window:  Window,

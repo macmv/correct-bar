@@ -1,7 +1,7 @@
 pub mod desktop;
 pub mod laptop;
 
-use correct_bar::module::Module;
+use correct_bar::bar::Module;
 
 pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
   (

@@ -1,10 +1,9 @@
 mod backend;
 pub mod bar;
 pub mod config;
-pub mod module;
 
+use bar::Updater;
 use config::Config;
-use module::Updater;
 
 pub fn run(config: Config) {
   let bar = backend::x11::setup(&config.window);

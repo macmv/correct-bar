@@ -1,4 +1,4 @@
-use crate::bar::{Color, RenderContext};
+use super::{Color, RenderContext};
 use crossbeam_channel::Receiver;
 use std::time::Duration;
 
