@@ -23,5 +23,6 @@ impl Rect {
 impl Add for Pos {
   type Output = Self;
 
+  #[track_caller]
   fn add(self, rhs: Self) -> Self::Output { Pos { x: self.x + rhs.x, y: self.y + rhs.y } }
 }

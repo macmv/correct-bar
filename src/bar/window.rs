@@ -27,12 +27,14 @@ impl Window {
   pub fn data(&self) -> &[u8] { &self.buf.data }
 
   pub fn draw_text(&mut self, pos: Pos, text: &str, color: Color) -> Rect {
-    let layout = self.font.layout(text, Scale::uniform(24.0), Point { x: 0.0, y: 0.0 });
+    let layout = self.font.layout(text, Scale::uniform(48.0), Point { x: 0.0, y: 0.0 });
     for glyph in layout {
       println!("{:?}", glyph);
       let bounds = glyph.pixel_bounding_box().unwrap();
-      let base =
-        Pos { x: (pos.x as i32 + bounds.min.x) as u32, y: (pos.y as i32 + bounds.min.y) as u32 };
+      let base = Pos {
+        x: (pos.x as i32 + bounds.min.x) as u32,
+        y: (pos.y as i32 + bounds.min.y + 20) as u32,
+      };
       glyph.draw(|x, y, coverage| {
         if coverage > 0.0 {
           self.buf.draw_pixel_alpha(base + Pos { x, y }, color, (coverage * 255.0) as u8);
