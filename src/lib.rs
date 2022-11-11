@@ -29,10 +29,10 @@ pub fn run(config: Config) {
               sleep_duration = Some(duration);
             }
           }
-          sleep_modules.push(*id);
+          sleep_modules.push(id);
         }
         Updater::Channel(recv) => {
-          channel_modules.push((*id, recv));
+          channel_modules.push((id, recv));
         }
       }
     }

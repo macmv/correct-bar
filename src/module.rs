@@ -2,7 +2,7 @@ use crossbeam_channel::Receiver;
 use std::time::Duration;
 
 pub struct Module {
-  imp: Box<dyn ModuleImpl>,
+  imp: Box<dyn ModuleImpl + Send + Sync>,
 }
 
 impl Module {
@@ -14,7 +14,7 @@ impl Module {
       sections: Vec<Section<'static>>,
     }
     impl ModuleImpl for ConstModule {
-      fn render(&mut self) -> &[Section] { &self.sections }
+      fn render(&self) -> &[Section] { &self.sections }
       fn updater(&self) -> Updater { Updater::Never }
     }
 
@@ -24,7 +24,7 @@ impl Module {
 
 impl<T> From<T> for Module
 where
-  T: ModuleImpl + 'static,
+  T: ModuleImpl + Send + Sync + 'static,
 {
   fn from(imp: T) -> Self { Module { imp: Box::new(imp) } }
 }
@@ -36,7 +36,7 @@ pub enum Updater {
 }
 
 pub trait ModuleImpl {
-  fn render(&mut self) -> &[Section];
+  fn render(&self) -> &[Section];
   fn updater(&self) -> Updater;
 }
 
