@@ -3,6 +3,10 @@ pub mod bar;
 pub mod config;
 pub mod module;
 
+use bar::Bar;
 use config::Config;
 
-pub fn run(config: Config) { backend::x11::run(&config.window); }
+pub fn run(config: Config) {
+  let bar = backend::x11::setup(&config.window);
+  loop {}
+}

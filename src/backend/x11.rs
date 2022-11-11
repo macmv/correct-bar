@@ -1,4 +1,7 @@
-use crate::{bar::Bar, config::WindowConfig};
+use crate::{
+  bar::{Backend, Bar, Window},
+  config::WindowConfig,
+};
 use parking_lot::Mutex;
 use std::{sync::Arc, thread};
 use xcb::{x, Xid};
@@ -56,8 +59,62 @@ enum Strut {
   BottomEndX,
 }
 
-pub fn run(config: &WindowConfig) -> Arc<Mutex<Bar>> {
-  match run_inner(config) {
+pub struct X11Backend {
+  conn:   Arc<xcb::Connection>,
+  window: xcb::x::Window,
+  pixmap: xcb::x::Pixmap,
+  gc:     xcb::x::Gcontext,
+  depth:  u8,
+}
+
+impl X11Backend {
+  pub fn send_check(&self, req: &impl xcb::RequestWithoutReply) -> xcb::Result<()> {
+    self.check(self.send(req))
+  }
+  pub fn send(&self, req: &impl xcb::RequestWithoutReply) -> xcb::VoidCookieChecked {
+    self.conn.send_request_checked(req)
+  }
+  pub fn check(&self, cookie: xcb::VoidCookieChecked) -> xcb::Result<()> {
+    self.conn.check_request(cookie)?;
+    Ok(())
+  }
+}
+
+impl Backend for X11Backend {
+  fn render(&self, window: &Window) {
+    self
+      .send_check(&xcb::x::PutImage {
+        data:     window.data(),
+        gc:       self.gc,
+        drawable: x::Drawable::Pixmap(self.pixmap),
+        depth:    self.depth,
+        width:    window.width() as u16,
+        height:   window.height() as u16,
+        dst_x:    0,
+        dst_y:    0,
+        format:   xcb::x::ImageFormat::ZPixmap,
+        left_pad: 0,
+      })
+      .unwrap();
+
+    self
+      .send_check(&xcb::x::CopyArea {
+        dst_drawable: x::Drawable::Window(self.window),
+        dst_x:        0,
+        dst_y:        0,
+        gc:           self.gc,
+        src_drawable: x::Drawable::Pixmap(self.pixmap),
+        src_x:        0,
+        src_y:        0,
+        width:        100,
+        height:       100,
+      })
+      .unwrap();
+  }
+}
+
+pub fn setup(config: &WindowConfig) -> Arc<Mutex<Bar>> {
+  match setup_inner(config) {
     Ok(bar) => bar,
     Err(e) => {
       println!("{e}");
@@ -66,7 +123,7 @@ pub fn run(config: &WindowConfig) -> Arc<Mutex<Bar>> {
   }
 }
 
-fn run_inner(config: &WindowConfig) -> xcb::Result<Arc<Mutex<Bar>>> {
+fn setup_inner(config: &WindowConfig) -> xcb::Result<Arc<Mutex<Bar>>> {
   let (conn, screen_num) = xcb::Connection::connect(None)?;
 
   let setup = conn.get_setup();
@@ -200,35 +257,11 @@ fn run_inner(config: &WindowConfig) -> xcb::Result<Arc<Mutex<Bar>>> {
   let mut maximized = false;
 
   let conn = Arc::new(conn);
-  let c2 = conn.clone();
-  let bar = Arc::new(Mutex::new(Bar::new(config.width, config.height, move |buf| {
-    c2.check_request(c2.send_request_checked(&xcb::x::PutImage {
-      data: buf,
-      gc,
-      drawable: x::Drawable::Pixmap(pixmap),
-      depth,
-      width: 100,
-      height: 100,
-      dst_x: 0,
-      dst_y: 0,
-      format: xcb::x::ImageFormat::ZPixmap,
-      left_pad: 0,
-    }))
-    .unwrap();
-
-    c2.check_request(c2.send_request_checked(&xcb::x::CopyArea {
-      dst_drawable: x::Drawable::Window(window),
-      dst_x: 0,
-      dst_y: 0,
-      gc,
-      src_drawable: x::Drawable::Pixmap(pixmap),
-      src_x: 0,
-      src_y: 0,
-      width: 100,
-      height: 100,
-    }))
-    .unwrap();
-  })));
+  let bar = Arc::new(Mutex::new(Bar::new(
+    config.width,
+    config.height,
+    X11Backend { conn: conn.clone(), window, pixmap, depth, gc },
+  )));
 
   // We enter the main event loop
   let b2 = bar.clone();
