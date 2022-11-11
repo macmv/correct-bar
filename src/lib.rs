@@ -8,19 +8,19 @@ use module::Updater;
 
 pub fn run(config: Config) {
   let bar = backend::x11::setup(&config.window);
-  {
-    let mut b = bar.lock();
-    b.window_mut().draw_rect(10, 10, 20, 20, bar::Color { r: 100, g: 0, b: 200 });
-    b.render();
-  }
 
   let mut sleep_duration = None;
   let mut sleep_modules = vec![];
   let mut channel_modules = vec![];
 
   {
-    let b = bar.lock();
-    for (id, module) in b.all_modules() {
+    let mut b = bar.lock();
+    b.modules.set_from_config(config);
+    b.window_mut().draw_rect(10, 10, 20, 20, bar::Color { r: 100, g: 0, b: 200 });
+
+    let mut all_modules = vec![];
+    for (key, module) in b.all_modules() {
+      all_modules.push(key);
       match module.imp().updater() {
         Updater::Never => {}
         Updater::Every(duration) => {
@@ -29,13 +29,17 @@ pub fn run(config: Config) {
               sleep_duration = Some(duration);
             }
           }
-          sleep_modules.push(id);
+          sleep_modules.push(key);
         }
         Updater::Channel(recv) => {
-          channel_modules.push((id, recv));
+          channel_modules.push((key, recv));
         }
       }
     }
+    for key in all_modules {
+      b.update_module(key);
+    }
+    b.render();
   }
 
   if !channel_modules.is_empty() {

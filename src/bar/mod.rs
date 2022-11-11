@@ -10,9 +10,13 @@ pub struct Bar {
   window:  Window,
   backend: Box<dyn Backend + Send + Sync>,
 
-  modules_left:   Vec<Module>,
-  modules_middle: Vec<Module>,
-  modules_right:  Vec<Module>,
+  pub modules: Modules,
+}
+
+pub struct Modules {
+  left:   Vec<Module>,
+  middle: Vec<Module>,
+  right:  Vec<Module>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -36,11 +40,9 @@ pub enum ModuleKey {
 impl Bar {
   pub fn new(width: u32, height: u32, backend: impl Backend + Send + Sync + 'static) -> Self {
     Bar {
-      window:         Window::new(width, height),
-      backend:        Box::new(backend),
-      modules_left:   vec![],
-      modules_middle: vec![],
-      modules_right:  vec![],
+      window:  Window::new(width, height),
+      backend: Box::new(backend),
+      modules: Modules::empty(),
     }
   }
 
@@ -49,37 +51,37 @@ impl Bar {
 
   pub fn render(&mut self) { self.backend.render(&self.window); }
 
-  pub fn all_modules(&self) -> impl Iterator<Item = (ModuleKey, &Module)> {
+  pub fn all_modules(&self) -> impl Iterator<Item = (ModuleKey, &Module)> { self.modules.iter() }
+  pub fn update_module(&mut self, key: ModuleKey) {
+    let mut ctx = RenderContext::new(&mut self.window);
+    let module = self.modules.by_key(key);
+    module.imp().render(&mut ctx);
+  }
+}
+
+impl Modules {
+  pub fn empty() -> Self { Modules { left: vec![], middle: vec![], right: vec![] } }
+  pub fn set_from_config(&mut self, config: crate::Config) {
+    self.left = config.modules_left;
+    self.middle = config.modules_middle;
+    self.right = config.modules_right;
+  }
+  pub fn iter(&self) -> impl Iterator<Item = (ModuleKey, &Module)> {
     self
-      .modules_left
+      .left
       .iter()
       .enumerate()
       .map(|(i, module)| (ModuleKey::Left(i as u32), module))
       .chain(
-        self
-          .modules_middle
-          .iter()
-          .enumerate()
-          .map(|(i, module)| (ModuleKey::Middle(i as u32), module)),
+        self.middle.iter().enumerate().map(|(i, module)| (ModuleKey::Middle(i as u32), module)),
       )
-      .chain(
-        self
-          .modules_right
-          .iter()
-          .enumerate()
-          .map(|(i, module)| (ModuleKey::Right(i as u32), module)),
-      )
+      .chain(self.right.iter().enumerate().map(|(i, module)| (ModuleKey::Right(i as u32), module)))
   }
-  pub fn update_module(&self, key: ModuleKey) {
-    let module = self.module(key);
-    let mut ctx = RenderContext::new(self.window(), module);
-    module.imp().render(&mut ctx);
-  }
-  pub fn module(&self, key: ModuleKey) -> &Module {
+  pub fn by_key(&self, key: ModuleKey) -> &Module {
     match key {
-      ModuleKey::Left(i) => &self.modules_left[i as usize],
-      ModuleKey::Middle(i) => &self.modules_middle[i as usize],
-      ModuleKey::Right(i) => &self.modules_right[i as usize],
+      ModuleKey::Left(i) => &self.left[i as usize],
+      ModuleKey::Middle(i) => &self.middle[i as usize],
+      ModuleKey::Right(i) => &self.right[i as usize],
     }
   }
 }
