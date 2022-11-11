@@ -1,8 +1,10 @@
 mod ctx;
+mod math;
 mod module;
 mod window;
 
 pub use ctx::RenderContext;
+pub use math::Pos;
 pub use module::{Module, Updater};
 pub use window::Window;
 
@@ -53,8 +55,8 @@ impl Bar {
 
   pub fn all_modules(&self) -> impl Iterator<Item = (ModuleKey, &Module)> { self.modules.iter() }
   pub fn update_module(&mut self, key: ModuleKey) {
-    let mut ctx = RenderContext::new(&mut self.window);
     let module = self.modules.by_key(key);
+    let mut ctx = RenderContext::new(&mut self.window, Pos { x: module.pos(), y: 20 });
     module.imp().render(&mut ctx);
   }
 }
