@@ -1,12 +1,18 @@
 use super::{Color, Pos, Rect};
-
 use rusttype::{Font, Point, Scale};
+use std::collections::HashMap;
 
 pub struct Window {
-  buf:  WindowBuf,
-  font: Font<'static>,
+  buf:  Buffer,
+  font: FontCache,
 }
-struct WindowBuf {
+
+struct FontCache {
+  font:   Font<'static>,
+  glyphs: HashMap<u32, Buffer>,
+}
+
+struct Buffer {
   data:   Vec<u8>,
   width:  u32,
   height: u32,
@@ -16,10 +22,9 @@ impl Window {
   pub fn new(width: u32, height: u32) -> Self {
     // let font =
     // std::fs::read("/usr/share/fonts/TTF/icomoon-feather.ttf").unwrap();
-    let font = std::fs::read("/usr/share/fonts/TTF/iosevka-regular.ttc").unwrap();
     Window {
-      buf:  WindowBuf { data: vec![0; (width * height * 4) as usize], width, height },
-      font: Font::try_from_vec(font).unwrap(),
+      buf:  Buffer::new(width, height),
+      font: FontCache::load("/usr/share/fonts/TTF/iosevka-regular.ttc"),
     }
   }
   pub fn width(&self) -> u32 { self.buf.width }
@@ -27,9 +32,8 @@ impl Window {
   pub fn data(&self) -> &[u8] { &self.buf.data }
 
   pub fn draw_text(&mut self, pos: Pos, text: &str, color: Color) -> Rect {
-    let layout = self.font.layout(text, Scale::uniform(48.0), Point { x: 0.0, y: 0.0 });
+    let layout = self.font.font.layout(text, Scale::uniform(48.0), Point { x: 0.0, y: 0.0 });
     for glyph in layout {
-      println!("{:?}", glyph);
       let bounds = glyph.pixel_bounding_box().unwrap();
       let base = Pos {
         x: (pos.x as i32 + bounds.min.x) as u32,
@@ -48,7 +52,18 @@ impl Window {
   pub fn draw_pixel(&mut self, pos: Pos, color: Color) { self.buf.draw_pixel(pos, color); }
 }
 
-impl WindowBuf {
+impl FontCache {
+  pub fn load(path: &str) -> Self {
+    let font = std::fs::read(path).unwrap();
+    FontCache { font: Font::try_from_vec(font).unwrap(), glyphs: HashMap::new() }
+  }
+}
+
+impl Buffer {
+  pub fn new(width: u32, height: u32) -> Self {
+    Buffer { data: vec![0; (width * height * 4) as usize], width, height }
+  }
+
   pub fn draw_rect(&mut self, rect: Rect, color: Color) {
     for x in rect.left()..rect.right() {
       for y in rect.top()..rect.bottom() {
