@@ -40,25 +40,28 @@ impl Window {
   pub fn data(&self) -> &[u8] { &self.buf.data }
 
   pub fn draw_text(&mut self, pos: Pos, text: &str, color: Color) -> Rect {
-    let mut width = 0;
-    let mut height = 0;
-    let layout = self.font.font.layout(text, Scale::uniform(48.0), Point { x: 0.0, y: 0.0 });
-    for glyph in layout {
-      let bounds = glyph.pixel_bounding_box().unwrap();
-      let base = Pos {
-        x: (pos.x as i32 + bounds.min.x) as u32,
-        y: (pos.y as i32 + bounds.min.y + 20) as u32,
-      };
-      if bounds.max.x - pos.x as i32 > width {
-        width = bounds.max.x - pos.x as i32;
+    let scale = Scale::uniform(48.0);
+    let mut last_glyph = None;
+    let mut caret = 0.0;
+    for c in text.chars() {
+      let glyph = self.font.font.glyph(c).scaled(scale);
+      if let Some(last) = last_glyph {
+        caret += self.font.font.pair_kerning(scale, last, glyph.id());
       }
-      if bounds.max.y - pos.y as i32 > height {
-        height = bounds.max.y - pos.y as i32;
+      let glyph = glyph.positioned(Point { x: caret, y: 0.0 });
+      caret += glyph.unpositioned().h_metrics().advance_width;
+      last_glyph = Some(glyph.id());
+
+      if let Some(bounds) = glyph.pixel_bounding_box() {
+        let base = Pos {
+          x: (pos.x as i32 + bounds.min.x) as u32,
+          y: (pos.y as i32 + bounds.min.y + 20) as u32,
+        };
+        let buf = self.font.cache.render(glyph.unpositioned());
+        self.buf.copy_from_alpha(base, color, buf);
       }
-      let buf = self.font.cache.render(glyph.unpositioned());
-      self.buf.copy_from_alpha(base, color, buf);
     }
-    Rect { pos, width: width as u32, height: height as u32 }
+    Rect { pos, width: caret as u32, height: 0 }
   }
 
   pub fn draw_rect(&mut self, rect: Rect, color: Color) { self.buf.draw_rect(rect, color); }
