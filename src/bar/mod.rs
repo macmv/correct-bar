@@ -7,11 +7,11 @@ pub struct Bar {
   backend: Box<dyn Backend + Send + Sync>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Color {
-  r: u8,
-  g: u8,
-  b: u8,
+  pub r: u8,
+  pub g: u8,
+  pub b: u8,
 }
 
 pub trait Backend {
@@ -24,6 +24,7 @@ impl Bar {
   }
 
   pub fn window(&self) -> &Window { &self.window }
+  pub fn window_mut(&mut self) -> &mut Window { &mut self.window }
 
   pub fn render(&mut self) { self.backend.render(&self.window); }
 }
