@@ -2,6 +2,8 @@ mod window;
 
 pub use window::Window;
 
+use crate::module::Module;
+
 pub struct Bar {
   window:  Window,
   backend: Box<dyn Backend + Send + Sync>,
@@ -27,4 +29,7 @@ impl Bar {
   pub fn window_mut(&mut self) -> &mut Window { &mut self.window }
 
   pub fn render(&mut self) { self.backend.render(&self.window); }
+
+  pub fn all_modules(&self) -> &[(u8, Module)] { &[] }
+  pub fn update_module(&self, key: u8) {}
 }
