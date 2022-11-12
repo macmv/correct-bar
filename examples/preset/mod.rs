@@ -1,3 +1,4 @@
+pub mod bspwm;
 pub mod desktop;
 pub mod laptop;
 
@@ -89,7 +90,7 @@ const SEP: Color = Color::from_hex(0x888888);
 pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
   (
     vec![
-      Module::text("foo", Color { r: 255, g: 255, b: 128 }).into(),
+      bspwm::BSPWM::new().into(),
       SepModule.into(),
       Module::text("100%", Color { r: 100, g: 255, b: 128 }).into(),
     ],
