@@ -188,13 +188,6 @@ impl Modules {
           .map(|(i, module)| (ModuleKey::Right(i as u32), &module.module)),
       )
   }
-  fn by_key(&self, key: ModuleKey) -> &PositionedModule {
-    match key {
-      ModuleKey::Left(i) => &self.left[i as usize],
-      ModuleKey::Middle(i) => &self.middle[i as usize],
-      ModuleKey::Right(i) => &self.right[i as usize],
-    }
-  }
   fn by_key_mut(&mut self, key: ModuleKey) -> &mut PositionedModule {
     match key {
       ModuleKey::Left(i) => &mut self.left[i as usize],
