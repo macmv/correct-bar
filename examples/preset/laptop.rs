@@ -12,7 +12,7 @@ pub fn run() {
       margin_right: 10,
       margin_bottom: 10,
       width: 1920 - 20,
-      height: 50,
+      height: 25,
       ..Default::default()
     },
     modules_left,

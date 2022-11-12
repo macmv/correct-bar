@@ -191,7 +191,7 @@ impl DynamicBuffer {
       if let Some(bounds) = glyph.pixel_bounding_box() {
         let base = Pos {
           x: (pos.x as i32 + bounds.min.x).try_into().unwrap(),
-          y: (pos.y as i32 + bounds.min.y + 40).try_into().unwrap(),
+          y: (pos.y as i32 + bounds.min.y).try_into().unwrap(),
         };
         let buf = font.cache.render(glyph.unpositioned());
         self.buf.copy_from_alpha(base, color, buf);
