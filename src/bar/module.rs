@@ -51,7 +51,7 @@ pub enum Updater {
 }
 
 pub trait ModuleImpl {
-  fn background(&self) -> Option<Color>;
+  fn background(&self) -> Option<Color> { None }
   fn render(&self, ctx: &mut RenderContext);
   fn updater(&self) -> Updater;
 }
