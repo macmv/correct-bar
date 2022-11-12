@@ -23,7 +23,7 @@ const SEP: Color = Color::from_hex(0x222222);
 pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
   (
     vec![
-      // modules::BSPWM::new().into(),
+      modules::BSPWM::new().into(),
       SepModule.into(),
       Module::text("100%", Color { r: 100, g: 255, b: 128 }).into(),
     ],
