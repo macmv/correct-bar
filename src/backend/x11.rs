@@ -113,7 +113,7 @@ impl Backend for X11Backend {
   }
 }
 
-pub fn setup(config: &Config) -> Arc<Mutex<Bar>> {
+pub fn setup(config: Config) -> Arc<Mutex<Bar>> {
   match setup_inner(config) {
     Ok(bar) => bar,
     Err(e) => {
@@ -123,7 +123,7 @@ pub fn setup(config: &Config) -> Arc<Mutex<Bar>> {
   }
 }
 
-fn setup_inner(config: &Config) -> xcb::Result<Arc<Mutex<Bar>>> {
+fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
   let (conn, screen_num) = xcb::Connection::connect(None)?;
 
   let setup = conn.get_setup();
@@ -248,7 +248,7 @@ fn setup_inner(config: &Config) -> xcb::Result<Arc<Mutex<Bar>>> {
 
   let conn = Arc::new(conn);
   let bar = Arc::new(Mutex::new(Bar::from_config(
-    &config,
+    config,
     X11Backend { conn: conn.clone(), window, pixmap, depth, gc },
   )));
 

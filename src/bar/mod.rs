@@ -13,9 +13,9 @@ pub use window::{DynamicBuffer, Window};
 use crate::config::Config;
 
 pub struct Bar {
-  window:     Window,
-  backend:    Box<dyn Backend + Send + Sync>,
-  background: Color,
+  config:  Config,
+  window:  Window,
+  backend: Box<dyn Backend + Send + Sync>,
 
   pub modules: Modules,
 }
@@ -37,6 +37,11 @@ impl PositionedModule {
   pub fn new(module: Module, height: u32, background: Color) -> PositionedModule {
     PositionedModule { module, pos: 0, buffer: DynamicBuffer::new(height, background) }
   }
+
+  pub fn width(&self, config: &Config) -> u32 {
+    let padding = self.module.imp().padding_override().unwrap_or(config.padding);
+    self.buffer.width() + padding.left + padding.right
+  }
 }
 
 pub trait Backend {
@@ -51,12 +56,12 @@ pub enum ModuleKey {
 }
 
 impl Bar {
-  pub fn from_config(config: &Config, backend: impl Backend + Send + Sync + 'static) -> Self {
+  pub fn from_config(mut config: Config, backend: impl Backend + Send + Sync + 'static) -> Self {
     Bar {
-      window:     Window::new(config.window.width, config.window.height),
-      backend:    Box::new(backend),
-      background: config.background,
-      modules:    Modules::empty(),
+      window: Window::new(config.window.width, config.window.height),
+      backend: Box::new(backend),
+      modules: Modules::from_config(&mut config),
+      config,
     }
   }
 
@@ -83,7 +88,7 @@ impl Bar {
   fn update_all(&mut self) {
     macro_rules! draw_module {
       ( $module:expr ) => {{
-        let background = $module.module.imp().background().unwrap_or(self.background);
+        let background = $module.module.imp().background().unwrap_or(self.config.background);
         $module.buffer.fill_and_set_background(background);
         let mut ctx = RenderContext::new(&mut self.window, &mut $module.buffer);
         $module.module.imp().render(&mut ctx);
@@ -104,7 +109,7 @@ impl Bar {
     for module in &mut self.modules.left {
       module.pos = pos;
       copy_module!(module);
-      pos += module.buffer.width();
+      pos += module.width(&self.config);
     }
 
     let width: u32 = self.modules.middle.iter().map(|m| m.buffer.width()).sum();
@@ -112,12 +117,12 @@ impl Bar {
     for module in self.modules.middle.iter_mut() {
       module.pos = pos;
       copy_module!(module);
-      pos += module.buffer.width();
+      pos += module.width(&self.config);
     }
 
     let mut pos = self.window.width();
     for module in self.modules.right.iter_mut().rev() {
-      pos -= module.buffer.width();
+      pos -= module.width(&self.config);
       module.pos = pos;
       copy_module!(module);
     }
@@ -161,23 +166,25 @@ impl Bar {
 }
 
 impl Modules {
-  pub fn empty() -> Self { Modules { left: vec![], middle: vec![], right: vec![] } }
-  pub fn set_from_config(&mut self, config: crate::Config) {
-    self.left = config
-      .modules_left
-      .into_iter()
-      .map(|m| PositionedModule::new(m, config.window.height, config.background))
-      .collect();
-    self.middle = config
-      .modules_middle
-      .into_iter()
-      .map(|m| PositionedModule::new(m, config.window.height, config.background))
-      .collect();
-    self.right = config
-      .modules_right
-      .into_iter()
-      .map(|m| PositionedModule::new(m, config.window.height, config.background))
-      .collect();
+  /// Drains the modules from the given config.
+  pub fn from_config(config: &mut crate::Config) -> Self {
+    Modules {
+      left:   config
+        .modules_left
+        .drain(..)
+        .map(|m| PositionedModule::new(m, config.window.height, config.background))
+        .collect(),
+      middle: config
+        .modules_middle
+        .drain(..)
+        .map(|m| PositionedModule::new(m, config.window.height, config.background))
+        .collect(),
+      right:  config
+        .modules_right
+        .drain(..)
+        .map(|m| PositionedModule::new(m, config.window.height, config.background))
+        .collect(),
+    }
   }
   pub fn iter(&self) -> impl Iterator<Item = (ModuleKey, &Module)> {
     self

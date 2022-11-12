@@ -6,7 +6,7 @@ use bar::Updater;
 use config::Config;
 
 pub fn run(config: Config) {
-  let bar = backend::x11::setup(&config);
+  let bar = backend::x11::setup(config);
 
   let mut sleep_duration = None;
   let mut sleep_modules = vec![];
@@ -14,7 +14,6 @@ pub fn run(config: Config) {
 
   {
     let mut b = bar.lock();
-    b.modules.set_from_config(config);
 
     let mut all_modules = vec![];
     for (key, module) in b.all_modules() {
