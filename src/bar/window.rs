@@ -7,7 +7,7 @@ pub struct Window {
   font: FontWithCache,
 }
 
-struct FontWithCache {
+pub struct FontWithCache {
   font:  Font<'static>,
   cache: FontCache,
 }
@@ -15,15 +15,21 @@ struct FontCache {
   glyphs: HashMap<GlyphId, AlphaBuffer>,
 }
 
-struct AlphaBuffer {
+pub struct AlphaBuffer {
   data:   Vec<u8>,
   width:  u32,
   height: u32,
 }
-struct Buffer {
+pub struct Buffer {
   data:   Vec<u8>,
   width:  u32,
   height: u32,
+}
+/// A buffer that will resize when drawn to. This one will only resize
+/// horizontally, because this bar is horizontal.
+pub struct DynamicBuffer {
+  buf:        Buffer,
+  background: Color,
 }
 
 impl Window {
@@ -38,34 +44,11 @@ impl Window {
   pub fn width(&self) -> u32 { self.buf.width }
   pub fn height(&self) -> u32 { self.buf.height }
   pub fn data(&self) -> &[u8] { &self.buf.data }
+  pub fn buffer(&self) -> &Buffer { &self.buf }
+  pub fn buffer_mut(&mut self) -> &mut Buffer { &mut self.buf }
 
-  pub fn draw_text(&mut self, pos: Pos, text: &str, color: Color) -> Rect {
-    let scale = Scale::uniform(48.0);
-    let mut last_glyph = None;
-    let mut caret = 0.0;
-    for c in text.chars() {
-      let glyph = self.font.font.glyph(c).scaled(scale);
-      if let Some(last) = last_glyph {
-        caret += self.font.font.pair_kerning(scale, last, glyph.id());
-      }
-      let glyph = glyph.positioned(Point { x: caret, y: 0.0 });
-      caret += glyph.unpositioned().h_metrics().advance_width;
-      last_glyph = Some(glyph.id());
-
-      if let Some(bounds) = glyph.pixel_bounding_box() {
-        let base = Pos {
-          x: (pos.x as i32 + bounds.min.x) as u32,
-          y: (pos.y as i32 + bounds.min.y + 20) as u32,
-        };
-        let buf = self.font.cache.render(glyph.unpositioned());
-        self.buf.copy_from_alpha(base, color, buf);
-      }
-    }
-    Rect { pos, width: caret as u32, height: 0 }
-  }
-
-  pub fn draw_rect(&mut self, rect: Rect, color: Color) { self.buf.draw_rect(rect, color); }
-  pub fn draw_pixel(&mut self, pos: Pos, color: Color) { self.buf.draw_pixel(pos, color); }
+  pub fn font(&self) -> &FontWithCache { &self.font }
+  pub fn font_mut(&mut self) -> &mut FontWithCache { &mut self.font }
 }
 
 impl FontWithCache {
@@ -115,6 +98,86 @@ impl AlphaBuffer {
   }
 }
 
+impl DynamicBuffer {
+  pub fn new(height: u32, background: Color) -> Self {
+    DynamicBuffer { buf: Buffer::new(0, height), background }
+  }
+
+  pub fn buffer(&self) -> &Buffer { &self.buf }
+  pub fn buffer_mut(&mut self) -> &mut Buffer { &mut self.buf }
+
+  pub fn fill_and_set_background(&mut self, color: Color) {
+    self.background = color;
+    self.buf.fill(color);
+  }
+
+  pub fn resize(&mut self, width: u32) {
+    if width > self.buf.width {
+      let mut buffer = Buffer::new(width, self.buf.height);
+      buffer.copy_from(Pos { x: 0, y: 0 }, &self.buf);
+      buffer.draw_rect(
+        Rect {
+          pos:    Pos { x: self.buf.width, y: 0 },
+          width:  width - self.buf.width,
+          height: self.buf.height,
+        },
+        self.background,
+      );
+      std::mem::swap(&mut self.buf, &mut buffer);
+    }
+  }
+
+  pub fn draw_text(
+    &mut self,
+    font: &mut FontWithCache,
+    pos: Pos,
+    text: &str,
+    color: Color,
+  ) -> Rect {
+    let scale = Scale::uniform(48.0);
+    let mut last_glyph = None;
+    let mut caret = 0.0;
+    for c in text.chars() {
+      let glyph = font.font.glyph(c).scaled(scale);
+      if let Some(last) = last_glyph {
+        caret += font.font.pair_kerning(scale, last, glyph.id());
+      }
+      let glyph = glyph.positioned(Point { x: caret, y: 0.0 });
+      caret += glyph.unpositioned().h_metrics().advance_width;
+      last_glyph = Some(glyph.id());
+    }
+
+    self.resize(pos.x + caret.ceil() as u32);
+
+    let mut last_glyph = None;
+    let mut caret = 0.0;
+    for c in text.chars() {
+      let glyph = font.font.glyph(c).scaled(scale);
+      if let Some(last) = last_glyph {
+        caret += font.font.pair_kerning(scale, last, glyph.id());
+      }
+      let glyph = glyph.positioned(Point { x: caret, y: 0.0 });
+      caret += glyph.unpositioned().h_metrics().advance_width;
+      last_glyph = Some(glyph.id());
+
+      if let Some(bounds) = glyph.pixel_bounding_box() {
+        let base = Pos {
+          x: (pos.x as i32 + bounds.min.x).try_into().unwrap(),
+          y: (pos.y as i32 + bounds.min.y + 40).try_into().unwrap(),
+        };
+        let buf = font.cache.render(glyph.unpositioned());
+        self.buf.copy_from_alpha(base, color, buf);
+      }
+    }
+
+    Rect { pos, width: caret as u32, height: 0 }
+  }
+  pub fn draw_rect(&mut self, rect: Rect, color: Color) {
+    self.resize(rect.right());
+    self.buf.draw_rect(rect, color);
+  }
+}
+
 impl Buffer {
   pub fn new(width: u32, height: u32) -> Self {
     Buffer { data: vec![0; (width * height * 4) as usize], width, height }
@@ -138,9 +201,16 @@ impl Buffer {
     }
   }
 
+  pub fn fill(&mut self, color: Color) {
+    for y in 0..self.height {
+      for x in 0..self.width {
+        self.draw_pixel(Pos { x, y }, color);
+      }
+    }
+  }
   pub fn draw_rect(&mut self, rect: Rect, color: Color) {
-    for x in rect.left()..rect.right() {
-      for y in rect.top()..rect.bottom() {
+    for y in rect.top()..rect.bottom() {
+      for x in rect.left()..rect.right() {
         self.draw_pixel(Pos { x, y }, color);
       }
     }

@@ -1,6 +1,6 @@
 use crate::{
   bar::{Backend, Bar, Window},
-  config::WindowConfig,
+  config::Config,
 };
 use parking_lot::Mutex;
 use std::{sync::Arc, thread};
@@ -113,7 +113,7 @@ impl Backend for X11Backend {
   }
 }
 
-pub fn setup(config: &WindowConfig) -> Arc<Mutex<Bar>> {
+pub fn setup(config: &Config) -> Arc<Mutex<Bar>> {
   match setup_inner(config) {
     Ok(bar) => bar,
     Err(e) => {
@@ -123,7 +123,7 @@ pub fn setup(config: &WindowConfig) -> Arc<Mutex<Bar>> {
   }
 }
 
-fn setup_inner(config: &WindowConfig) -> xcb::Result<Arc<Mutex<Bar>>> {
+fn setup_inner(config: &Config) -> xcb::Result<Arc<Mutex<Bar>>> {
   let (conn, screen_num) = xcb::Connection::connect(None)?;
 
   let setup = conn.get_setup();
@@ -137,10 +137,10 @@ fn setup_inner(config: &WindowConfig) -> xcb::Result<Arc<Mutex<Bar>>> {
     depth:        x::COPY_FROM_PARENT as u8,
     wid:          window,
     parent:       screen.root(),
-    x:            config.margin_left as i16,
-    y:            config.margin_top as i16,
-    width:        config.width as u16,
-    height:       config.height as u16,
+    x:            config.window.margin_left as i16,
+    y:            config.window.margin_top as i16,
+    width:        config.window.width as u16,
+    height:       config.window.height as u16,
     border_width: 0,
     class:        x::WindowClass::InputOutput,
     visual:       screen.root_visual(),
@@ -186,9 +186,10 @@ fn setup_inner(config: &WindowConfig) -> xcb::Result<Arc<Mutex<Bar>>> {
   conn.check_request(cookie)?;
 
   let mut strut = [0_u32; 12];
-  strut[Strut::Top as usize] = config.margin_top + config.height + config.margin_bottom;
-  strut[Strut::TopStartX as usize] = config.margin_left;
-  strut[Strut::TopEndX as usize] = config.width - config.margin_right;
+  strut[Strut::Top as usize] =
+    config.window.margin_top + config.window.height + config.window.margin_bottom;
+  strut[Strut::TopStartX as usize] = config.window.margin_left;
+  strut[Strut::TopEndX as usize] = config.window.width - config.window.margin_right;
 
   let cookie = conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Replace,
@@ -229,8 +230,8 @@ fn setup_inner(config: &WindowConfig) -> xcb::Result<Arc<Mutex<Bar>>> {
   conn.check_request(conn.send_request_checked(&x::CreatePixmap {
     drawable: x::Drawable::Window(window),
     pid: pixmap,
-    height: config.height as u16,
-    width: config.width as u16,
+    height: config.window.height as u16,
+    width: config.window.width as u16,
     depth,
   }))?;
 
@@ -246,9 +247,8 @@ fn setup_inner(config: &WindowConfig) -> xcb::Result<Arc<Mutex<Bar>>> {
   let mut maximized = false;
 
   let conn = Arc::new(conn);
-  let bar = Arc::new(Mutex::new(Bar::new(
-    config.width,
-    config.height,
+  let bar = Arc::new(Mutex::new(Bar::from_config(
+    &config,
     X11Backend { conn: conn.clone(), window, pixmap, depth, gc },
   )));
 

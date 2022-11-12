@@ -1,8 +1,9 @@
-use crate::bar::Module;
+use crate::bar::{Color, Module};
 
 #[derive(Default)]
 pub struct Config {
-  pub window: WindowConfig,
+  pub window:     WindowConfig,
+  pub background: Color,
 
   pub modules_left:   Vec<Module>,
   pub modules_middle: Vec<Module>,

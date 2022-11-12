@@ -8,11 +8,14 @@ pub use color::Color;
 pub use ctx::RenderContext;
 pub use math::{Pos, Rect};
 pub use module::{Module, Updater};
-pub use window::Window;
+pub use window::{DynamicBuffer, Window};
+
+use crate::config::Config;
 
 pub struct Bar {
-  window:  Window,
-  backend: Box<dyn Backend + Send + Sync>,
+  window:     Window,
+  backend:    Box<dyn Backend + Send + Sync>,
+  background: Color,
 
   pub modules: Modules,
 }
@@ -27,10 +30,13 @@ struct PositionedModule {
   module: Module,
   pos:    u32,
   width:  u32,
+  buffer: DynamicBuffer,
 }
 
-impl From<Module> for PositionedModule {
-  fn from(module: Module) -> Self { PositionedModule { module, pos: 0, width: 0 } }
+impl PositionedModule {
+  pub fn new(module: Module, height: u32, background: Color) -> PositionedModule {
+    PositionedModule { module, pos: 0, width: 0, buffer: DynamicBuffer::new(height, background) }
+  }
 }
 
 pub trait Backend {
@@ -45,11 +51,12 @@ pub enum ModuleKey {
 }
 
 impl Bar {
-  pub fn new(width: u32, height: u32, backend: impl Backend + Send + Sync + 'static) -> Self {
+  pub fn from_config(config: &Config, backend: impl Backend + Send + Sync + 'static) -> Self {
     Bar {
-      window:  Window::new(width, height),
-      backend: Box::new(backend),
-      modules: Modules::empty(),
+      window:     Window::new(config.window.width, config.window.height),
+      backend:    Box::new(backend),
+      background: config.background,
+      modules:    Modules::empty(),
     }
   }
 
@@ -60,21 +67,42 @@ impl Bar {
 
   pub fn all_modules(&self) -> impl Iterator<Item = (ModuleKey, &Module)> { self.modules.iter() }
   pub fn update_module(&mut self, key: ModuleKey) {
+    /*
     let module = self.modules.by_key_mut(key);
-    let mut ctx = RenderContext::new(&mut self.window, Pos { x: module.pos, y: 20 });
+    let mut ctx = RenderContext::new(&mut module.buffer, Pos { x: module.pos, y: 20 });
     module.module.imp().render(&mut ctx);
     if ctx.width != module.width {
       module.width = ctx.width;
-      self.resize_from(key);
+    */
+    self.update_from(key);
+    /*
+      }
+    */
+  }
+
+  fn update_all(&mut self) {
+    let mut pos = 0;
+    for module in &mut self.modules.left {
+      module.pos = pos;
+      let background = module.module.imp().background().unwrap_or(self.background);
+      module.buffer.fill_and_set_background(background);
+      let mut ctx =
+        RenderContext::new(&mut self.window, &mut module.buffer, Pos { x: module.pos, y: 20 });
+      module.module.imp().render(&mut ctx);
+      self.window.buffer_mut().copy_from(Pos { x: module.pos, y: 0 }, &module.buffer.buffer());
+      pos += module.width;
     }
   }
 
-  fn resize_from(&mut self, key: ModuleKey) {
+  fn update_from(&mut self, key: ModuleKey) {
+    self.update_all();
+    /*
     match key {
-      ModuleKey::Left(idx) => {
-        let mut pos = self.modules.left[idx as usize].pos;
-        for module in self.modules.left.iter_mut().skip(idx as usize) {
-          pos += module.reposition(pos);
+      ModuleKey::Left(_) => {
+        let mut pos = self.modules.left[0].pos;
+        for module in self.modules.left.iter_mut() {
+          module.pos = pos;
+          pos += module.width;
         }
       }
       ModuleKey::Middle(_) => {
@@ -84,25 +112,43 @@ impl Bar {
         }
         let mut pos = self.window.width() / 2 - width / 2;
         for module in self.modules.middle.iter_mut() {
-          pos += module.reposition(pos);
+          module.pos = pos;
+          pos += module.width;
         }
       }
-      ModuleKey::Right(idx) => {
-        let mut pos = self.modules.left[idx as usize].pos;
-        for module in self.modules.left.iter_mut().skip(idx as usize).rev() {
-          pos -= module.reposition(pos);
+      ModuleKey::Right(_) => {
+        let mut pos = self.modules.right[0].pos;
+        if pos < self.window.width() / 2 {
+          pos = self.window.width();
+        }
+        for module in self.modules.right.iter_mut().rev() {
+          pos -= module.width;
+          module.pos = pos;
         }
       }
     }
+    */
   }
 }
 
 impl Modules {
   pub fn empty() -> Self { Modules { left: vec![], middle: vec![], right: vec![] } }
   pub fn set_from_config(&mut self, config: crate::Config) {
-    self.left = config.modules_left.into_iter().map(Into::into).collect();
-    self.middle = config.modules_middle.into_iter().map(Into::into).collect();
-    self.right = config.modules_right.into_iter().map(Into::into).collect();
+    self.left = config
+      .modules_left
+      .into_iter()
+      .map(|m| PositionedModule::new(m, config.window.height, config.background))
+      .collect();
+    self.middle = config
+      .modules_middle
+      .into_iter()
+      .map(|m| PositionedModule::new(m, config.window.height, config.background))
+      .collect();
+    self.right = config
+      .modules_right
+      .into_iter()
+      .map(|m| PositionedModule::new(m, config.window.height, config.background))
+      .collect();
   }
   pub fn iter(&self) -> impl Iterator<Item = (ModuleKey, &Module)> {
     self
@@ -138,12 +184,5 @@ impl Modules {
       ModuleKey::Middle(i) => &mut self.middle[i as usize],
       ModuleKey::Right(i) => &mut self.right[i as usize],
     }
-  }
-}
-
-impl PositionedModule {
-  pub fn reposition(&mut self, pos: u32) -> u32 {
-    self.pos = pos;
-    self.width
   }
 }

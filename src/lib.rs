@@ -6,7 +6,7 @@ use bar::Updater;
 use config::Config;
 
 pub fn run(config: Config) {
-  let bar = backend::x11::setup(&config.window);
+  let bar = backend::x11::setup(&config);
 
   let mut sleep_duration = None;
   let mut sleep_modules = vec![];
