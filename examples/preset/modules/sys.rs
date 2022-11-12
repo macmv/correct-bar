@@ -1,8 +1,7 @@
 use chrono::{Datelike, Timelike};
 use correct_bar::bar::{Color, ModuleImpl, Updater};
-use parking_lot::Mutex;
 use std::{cell::RefCell, time::Duration};
-use sysinfo::{ComponentExt, CpuExt, CpuRefreshKind, RefreshKind, SystemExt};
+use sysinfo::{ComponentExt, CpuExt, SystemExt};
 
 pub struct Time {
   pub primary:   Color,
@@ -28,13 +27,20 @@ impl ModuleImpl for Time {
         ctx.draw_text(
           &format!("{:02}:{:02}:{:02}", $time.hour(), $time.minute(), $time.second()),
           Color::white(),
-        );
+        )
       };
     }
 
-    draw_time!(local);
+    let local_rect = draw_time!(local);
     ctx.draw_text(" or ", self.secondary);
-    draw_time!(utc);
+    let utc_rect = draw_time!(utc);
+
+    fn copy_time<T: chrono::TimeZone>(time: chrono::DateTime<T>) {}
+
+    if ctx.needs_click_regions() {
+      ctx.add_on_click(local_rect, move || copy_time(chrono::Local::now()));
+      ctx.add_on_click(utc_rect, move || copy_time(chrono::Utc::now()));
+    }
   }
 }
 
