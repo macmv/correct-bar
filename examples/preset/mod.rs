@@ -1,6 +1,6 @@
-pub mod bspwm;
 pub mod desktop;
 pub mod laptop;
+pub mod modules;
 
 use chrono::{Datelike, Timelike};
 use correct_bar::{
@@ -93,7 +93,7 @@ const SEP: Color = Color::from_hex(0x888888);
 pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
   (
     vec![
-      bspwm::BSPWMModule::new().into(),
+      modules::BSPWM::new().into(),
       SepModule.into(),
       Module::text("100%", Color { r: 100, g: 255, b: 128 }).into(),
     ],

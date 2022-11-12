@@ -9,7 +9,7 @@ use std::{
 };
 
 #[derive(Clone)]
-pub struct BSPWMModule {
+pub struct BSPWM {
   path:    String,
   channel: Receiver<()>,
   state:   Arc<Mutex<json::WmState>>,
@@ -17,8 +17,8 @@ pub struct BSPWMModule {
 
 fn parse_hex(s: &str) -> u32 { u32::from_str_radix(&s[2..], 16).unwrap() }
 
-impl BSPWMModule {
-  pub fn new() -> Self { BSPWMModule::new_at("/tmp/bspwm_0_0-socket") }
+impl BSPWM {
+  pub fn new() -> Self { BSPWM::new_at("/tmp/bspwm_0_0-socket") }
   pub fn new_at(path: &str) -> Self {
     let state = send_immediate_json::<json::WmState>(path, &["wm", "-d"]).unwrap();
     let state = Arc::new(Mutex::new(state));
@@ -46,7 +46,7 @@ impl BSPWMModule {
         line.clear();
       }
     });
-    BSPWMModule { path: path.into(), channel: rx, state }
+    BSPWM { path: path.into(), channel: rx, state }
   }
 }
 
@@ -90,7 +90,7 @@ fn switch_desktop(path: &str, desktop: u32) {
   send_immediate(path, &["desktop", "-f", &desktop.to_string()]).unwrap();
 }
 
-impl ModuleImpl for BSPWMModule {
+impl ModuleImpl for BSPWM {
   fn updater(&self) -> Updater { Updater::Channel(self.channel.clone()) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     let state = self.state.lock();
