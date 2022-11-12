@@ -1,11 +1,8 @@
 use chrono::{Datelike, Timelike};
-use correct_bar::{
-  bar::{Color, ModuleImpl, Updater},
-  math::Rect,
-};
+use correct_bar::bar::{Color, ModuleImpl, Updater};
 use parking_lot::Mutex;
 use std::time::Duration;
-use sysinfo::{CpuExt, SystemExt};
+use sysinfo::{CpuExt, CpuRefreshKind, RefreshKind, SystemExt};
 
 pub struct Time {
   pub primary:   Color,
@@ -42,15 +39,46 @@ impl ModuleImpl for Time {
   }
 }
 
-pub struct CpuMem {
+pub struct Cpu {
   sys: Mutex<sysinfo::System>,
 }
 
-impl CpuMem {
-  pub fn new() -> Self { CpuMem { sys: Mutex::new(sysinfo::System::new_all()) } }
+impl Cpu {
+  pub fn new() -> Self {
+    Cpu {
+      sys: Mutex::new(sysinfo::System::new_with_specifics(
+        RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+      )),
+    }
+  }
 }
 
-impl ModuleImpl for CpuMem {
+impl ModuleImpl for Cpu {
+  fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
+  fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
+    let mut sys = self.sys.lock();
+    sys.refresh_all();
+    ctx.draw_text(
+      &format!(
+        "{:>2.00}%",
+        sys.cpus().iter().map(|c| c.cpu_usage()).sum::<f32>() / sys.cpus().len() as f32,
+      ),
+      Color::from_hex(0xff0000),
+    );
+  }
+}
+
+pub struct Mem {
+  sys: Mutex<sysinfo::System>,
+}
+
+impl Mem {
+  pub fn new() -> Self {
+    Mem { sys: Mutex::new(sysinfo::System::new_with_specifics(RefreshKind::new().with_memory())) }
+  }
+}
+
+impl ModuleImpl for Mem {
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     let mut sys = self.sys.lock();
@@ -62,16 +90,6 @@ impl ModuleImpl for CpuMem {
         sys.total_memory() as f64 / (1024 * 1024 * 1024) as f64,
       ),
       Color::from_hex(0xffff00),
-    );
-    ctx.advance_by(ctx.padding().left);
-    ctx.draw_rect(Rect { pos: ctx.pos(), width: 2, height: ctx.height() }, Color::white());
-    ctx.advance_by(ctx.padding().right + 2);
-    ctx.draw_text(
-      &format!(
-        "{:>2.00}%",
-        sys.cpus().iter().map(|c| c.cpu_usage()).sum::<f32>() / sys.cpus().len() as f32,
-      ),
-      Color::from_hex(0xff0000),
     );
   }
 }

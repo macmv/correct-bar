@@ -35,7 +35,9 @@ pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
     vec![
       Module::text("mmm things", Color { r: 255, g: 100, b: 128 }).into(),
       SepModule.into(),
-      modules::CpuMem::new().into(),
+      modules::Cpu::new().into(),
+      SepModule.into(),
+      modules::Mem::new().into(),
       SepModule.into(),
       modules::Time { primary: Color::white(), secondary: SEP }.into(),
     ],
