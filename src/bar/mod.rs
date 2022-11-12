@@ -31,11 +31,20 @@ struct PositionedModule {
   module: Module,
   pos:    u32,
   buffer: DynamicBuffer,
+
+  stale_width:   bool,
+  stale_content: bool,
 }
 
 impl PositionedModule {
   pub fn new(module: Module, height: u32, background: Color) -> PositionedModule {
-    PositionedModule { module, pos: 0, buffer: DynamicBuffer::new(height, background) }
+    PositionedModule {
+      module,
+      pos: 0,
+      buffer: DynamicBuffer::new(height, background),
+      stale_width: true,
+      stale_content: true,
+    }
   }
 
   pub fn width(&self, _config: &Config) -> u32 { self.buffer.width() }
@@ -65,104 +74,75 @@ impl Bar {
   pub fn window(&self) -> &Window { &self.window }
   pub fn window_mut(&mut self) -> &mut Window { &mut self.window }
 
-  pub fn render(&mut self) { self.backend.render(&self.window); }
-
-  pub fn all_modules(&self) -> impl Iterator<Item = (ModuleKey, &Module)> { self.modules.iter() }
-  pub fn update_module(&mut self, key: ModuleKey) {
-    /*
-    let module = self.modules.by_key_mut(key);
-    let mut ctx = RenderContext::new(&mut module.buffer, Pos { x: module.pos, y: 20 });
-    module.module.imp().render(&mut ctx);
-    if ctx.width != module.width {
-      module.width = ctx.width;
-    */
-    self.update_from(key);
-    /*
-      }
-    */
-  }
-
-  fn update_all(&mut self) {
-    macro_rules! draw_module {
-      ( $module:expr ) => {{
-        let background = $module.module.imp().background().unwrap_or(self.config.background);
-        $module.buffer.fill_and_set_background(background);
-        let mut ctx = RenderContext::new(
-          $module.module.imp().padding_override().unwrap_or(self.config.padding),
-          &mut self.window,
-          &mut $module.buffer,
-        );
-        $module.module.imp().render(&mut ctx);
-      }};
-    }
-
+  pub fn render(&mut self) {
     macro_rules! copy_module {
       ( $module:expr ) => {
         self.window.buffer_mut().copy_from(Pos { x: $module.pos, y: 0 }, &$module.buffer.buffer());
       };
     }
 
-    self.modules.left.iter_mut().for_each(|m| draw_module!(m));
-    self.modules.middle.iter_mut().for_each(|m| draw_module!(m));
-    self.modules.right.iter_mut().for_each(|m| draw_module!(m));
-
-    let mut pos = 0;
-    for module in &mut self.modules.left {
-      module.pos = pos;
-      copy_module!(module);
-      pos += module.width(&self.config);
+    macro_rules! copy_modules {
+      ( $modules:expr ) => {
+        for module in &mut $modules {
+          if module.stale_content {
+            module.stale_content = false;
+            copy_module!(module);
+          }
+        }
+      };
     }
 
-    let width: u32 = self.modules.middle.iter().map(|m| m.buffer.width()).sum();
-    let mut pos = self.window.width() / 2 - width / 2;
-    for module in self.modules.middle.iter_mut() {
-      module.pos = pos;
-      copy_module!(module);
-      pos += module.width(&self.config);
+    if self.modules.left.iter().any(|m| m.stale_width) {
+      let mut pos = 0;
+      for module in &mut self.modules.left {
+        module.pos = pos;
+        module.stale_width = false;
+        pos += module.width(&self.config);
+      }
     }
+    if self.modules.middle.iter().any(|m| m.stale_width) {
+      let width: u32 = self.modules.middle.iter().map(|m| m.buffer.width()).sum();
+      let mut pos = self.window.width() / 2 - width / 2;
+      for module in self.modules.middle.iter_mut() {
+        module.pos = pos;
+        module.stale_width = false;
+        copy_module!(module);
+        pos += module.width(&self.config);
+      }
+    }
+    if self.modules.right.iter().any(|m| m.stale_width) {
+      let mut pos = self.window.width();
+      for module in self.modules.right.iter_mut().rev() {
+        pos -= module.width(&self.config);
+        module.pos = pos;
+        module.stale_width = false;
+        copy_module!(module);
+      }
+    }
+    copy_modules!(self.modules.left);
+    copy_modules!(self.modules.middle);
+    copy_modules!(self.modules.right);
 
-    let mut pos = self.window.width();
-    for module in self.modules.right.iter_mut().rev() {
-      pos -= module.width(&self.config);
-      module.pos = pos;
-      copy_module!(module);
-    }
+    self.backend.render(&self.window);
   }
 
-  fn update_from(&mut self, key: ModuleKey) {
-    self.update_all();
-    /*
-    match key {
-      ModuleKey::Left(_) => {
-        let mut pos = self.modules.left[0].pos;
-        for module in self.modules.left.iter_mut() {
-          module.pos = pos;
-          pos += module.width;
-        }
-      }
-      ModuleKey::Middle(_) => {
-        let mut width = 0;
-        for module in self.modules.middle.iter() {
-          width += module.width;
-        }
-        let mut pos = self.window.width() / 2 - width / 2;
-        for module in self.modules.middle.iter_mut() {
-          module.pos = pos;
-          pos += module.width;
-        }
-      }
-      ModuleKey::Right(_) => {
-        let mut pos = self.modules.right[0].pos;
-        if pos < self.window.width() / 2 {
-          pos = self.window.width();
-        }
-        for module in self.modules.right.iter_mut().rev() {
-          pos -= module.width;
-          module.pos = pos;
-        }
-      }
+  pub fn all_modules(&self) -> impl Iterator<Item = (ModuleKey, &Module)> { self.modules.iter() }
+  pub fn update_module(&mut self, key: ModuleKey) {
+    let module = self.modules.by_key_mut(key);
+    let background = module.module.imp().background().unwrap_or(self.config.background);
+    module.buffer.fill_and_set_background(background);
+    let old_width = module.buffer.width();
+    let mut ctx = RenderContext::new(
+      module.module.imp().padding_override().unwrap_or(self.config.padding),
+      &mut self.window,
+      &mut module.buffer,
+    );
+    module.module.imp().render(&mut ctx);
+
+    module.stale_content = true;
+    if module.buffer.width() != old_width {
+      module.stale_width = true;
     }
-    */
   }
 }
 
