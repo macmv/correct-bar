@@ -10,7 +10,6 @@ use std::{
 
 #[derive(Clone)]
 pub struct BSPWMModule {
-  path:    String,
   channel: Receiver<()>,
   state:   Arc<Mutex<json::WmState>>,
 }
@@ -46,7 +45,7 @@ impl BSPWMModule {
         line.clear();
       }
     });
-    BSPWMModule { path: path.into(), channel: rx, state }
+    BSPWMModule { channel: rx, state }
   }
 }
 
