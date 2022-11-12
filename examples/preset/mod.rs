@@ -2,7 +2,6 @@ pub mod desktop;
 pub mod laptop;
 pub mod modules;
 
-use chrono::{Datelike, Timelike};
 use correct_bar::{
   bar::{Color, Module, ModuleImpl, Padding, Updater},
   math::Rect,
@@ -19,38 +18,6 @@ impl ModuleImpl for SepModule {
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     ctx.draw_rect(Rect { pos: ctx.pos(), width: 2, height: ctx.height() }, SEP);
     ctx.advance_by(2);
-  }
-}
-
-struct TimeModule;
-
-impl ModuleImpl for TimeModule {
-  fn background(&self) -> Option<Color> { Some(Color::from_hex(0x001122)) }
-  fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
-  fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
-    let local = chrono::Local::now();
-    let utc = local.naive_utc();
-
-    ctx.draw_text(&local.weekday().to_string(), Color::white());
-    ctx.draw_text(", ", SEP);
-    ctx.draw_text(
-      &format!("{:04}-{:02}-{:02}", local.year(), local.month(), local.day()),
-      Color::white(),
-    );
-    ctx.draw_text(" at ", SEP);
-
-    macro_rules! draw_time {
-      ( $time:expr ) => {
-        ctx.draw_text(
-          &format!("{:02}:{:02}:{:02}", $time.hour(), $time.minute(), $time.second()),
-          Color::white(),
-        );
-      };
-    }
-
-    draw_time!(local);
-    ctx.draw_text(" or ", SEP);
-    draw_time!(utc);
   }
 }
 
@@ -107,7 +74,7 @@ pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
       SepModule.into(),
       CpuMemModule::new().into(),
       SepModule.into(),
-      TimeModule.into(),
+      modules::Time { primary: Color::white(), secondary: SEP }.into(),
     ],
   )
 }
