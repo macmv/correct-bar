@@ -54,7 +54,9 @@ impl ModuleImpl for CpuMemModule {
       ),
       Color::from_hex(0xffff00),
     );
-    ctx.draw_text(" | ", SEP);
+    let mut rect = ctx.advance_text("  ");
+    rect.resize_to(2, rect.height);
+    ctx.draw_rect(rect, SEP);
     ctx.draw_text(
       &format!(
         "{:>2.00}%",

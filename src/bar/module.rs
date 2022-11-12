@@ -13,7 +13,7 @@ pub struct TextModule {
 }
 impl ModuleImpl for TextModule {
   fn background(&self) -> Option<Color> { self.background }
-  fn render(&self, ctx: &mut RenderContext) { ctx.draw_text(self.text, self.color) }
+  fn render(&self, ctx: &mut RenderContext) { ctx.draw_text(self.text, self.color); }
   fn updater(&self) -> Updater { Updater::Never }
 }
 
