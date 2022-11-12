@@ -85,8 +85,7 @@ impl Bar {
       ( $module:expr ) => {{
         let background = $module.module.imp().background().unwrap_or(self.background);
         $module.buffer.fill_and_set_background(background);
-        let mut ctx =
-          RenderContext::new(&mut self.window, &mut $module.buffer, Pos { x: $module.pos, y: 20 });
+        let mut ctx = RenderContext::new(&mut self.window, &mut $module.buffer);
         $module.module.imp().render(&mut ctx);
       }};
     }

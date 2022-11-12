@@ -15,3 +15,4 @@ xcb = "1.2.0"
 
 [dev-dependencies]
 chrono = "0.4.22"
+sysinfo = "0.26.7"
