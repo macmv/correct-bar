@@ -61,7 +61,7 @@ impl BSPWM {
 }
 
 impl ModuleImpl for BSPWMModule {
-  fn updater(&self) -> Updater { Updater::Never }
+  fn updater(&self) -> Updater { Updater::Channel(self.channel.as_ref().unwrap().clone()) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     /*
     {
