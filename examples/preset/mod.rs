@@ -7,11 +7,18 @@ use parking_lot::Mutex;
 use std::time::Duration;
 use sysinfo::{CpuExt, SystemExt};
 
-struct TimeModule;
+struct SepModule;
 
-struct CpuMemModule {
-  sys: Mutex<sysinfo::System>,
+impl ModuleImpl for SepModule {
+  fn updater(&self) -> Updater { Updater::Never }
+  fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
+    let mut rect = ctx.advance_text("  ");
+    rect.resize_to(2, rect.height);
+    ctx.draw_rect(rect, SEP);
+  }
 }
+
+struct TimeModule;
 
 impl ModuleImpl for TimeModule {
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
@@ -35,6 +42,10 @@ impl ModuleImpl for TimeModule {
       Color::white(),
     );
   }
+}
+
+struct CpuMemModule {
+  sys: Mutex<sysinfo::System>,
 }
 
 impl CpuMemModule {
@@ -68,26 +79,25 @@ impl ModuleImpl for CpuMemModule {
 }
 
 const SEP: Color = Color::from_hex(0x888888);
-fn sep(text: &'static str) -> impl ModuleImpl { Module::text(text, SEP) }
 
 pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
   (
     vec![
       Module::text("foo", Color { r: 255, g: 255, b: 128 }).into(),
-      sep(" | ").into(),
+      SepModule.into(),
       Module::text("100%", Color { r: 100, g: 255, b: 128 }).into(),
     ],
     vec![
       Module::text("HELLO WORLD", Color { r: 255, g: 255, b: 128 }).into(),
-      sep(" | ").into(),
+      SepModule.into(),
       Module::text("foo and stuff", Color { r: 100, g: 255, b: 128 }).into(),
     ],
     vec![
       Module::text("mmm things", Color { r: 255, g: 100, b: 128 }).into(),
-      sep(" | ").into(),
-      Module::from(CpuMemModule::new()).into(),
-      sep(" | ").into(),
-      Module::from(TimeModule).into(),
+      SepModule.into(),
+      CpuMemModule::new().into(),
+      SepModule.into(),
+      TimeModule.into(),
     ],
   )
 }
