@@ -1,5 +1,5 @@
 use correct_bar::{
-  bar::Padding,
+  bar::{Color, Padding},
   config::{Config, WindowConfig},
 };
 
@@ -19,6 +19,7 @@ pub fn run() {
     modules_middle,
     modules_right,
     padding: Padding { left: 20, right: 20, top: 0, bottom: 0 },
+    background: Color::from_hex(0x464646),
     ..Default::default()
   };
   correct_bar::run(config)
