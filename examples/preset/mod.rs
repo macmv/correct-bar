@@ -3,7 +3,10 @@ pub mod desktop;
 pub mod laptop;
 
 use chrono::{Datelike, Timelike};
-use correct_bar::bar::{Color, Module, ModuleImpl, Padding, Rect, Updater};
+use correct_bar::{
+  bar::{Color, Module, ModuleImpl, Padding, Updater},
+  math::Rect,
+};
 use parking_lot::Mutex;
 use std::time::Duration;
 use sysinfo::{CpuExt, SystemExt};

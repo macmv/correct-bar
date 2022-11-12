@@ -1,4 +1,5 @@
-use super::{ClickRegion, Color, DynamicBuffer, Padding, Pos, Rect, Window};
+use super::{ClickRegion, Color, DynamicBuffer, Padding, Window};
+use crate::math::{Pos, Rect};
 
 pub struct RenderContext<'a> {
   padding:       Padding,

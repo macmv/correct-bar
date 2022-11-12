@@ -1,16 +1,17 @@
 mod color;
 mod ctx;
-mod math;
 mod module;
 mod window;
 
 pub use color::Color;
 pub use ctx::RenderContext;
-pub use math::{Pos, Rect};
 pub use module::{Module, ModuleImpl, Padding, Updater};
 pub use window::{DynamicBuffer, Window};
 
-use crate::config::Config;
+use crate::{
+  config::Config,
+  math::{Pos, Rect},
+};
 use std::fmt;
 
 pub struct Bar {

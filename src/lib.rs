@@ -1,6 +1,7 @@
 mod backend;
 pub mod bar;
 pub mod config;
+pub mod math;
 
 use bar::Updater;
 use config::Config;

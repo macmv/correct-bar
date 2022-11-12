@@ -1,4 +1,5 @@
-use super::{Color, Pos, Rect};
+use super::Color;
+use crate::math::{Pos, Rect};
 use rusttype::{Font, GlyphId, Point, Scale, ScaledGlyph};
 use std::{collections::HashMap, fmt};
 
