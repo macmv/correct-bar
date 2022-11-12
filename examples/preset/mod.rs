@@ -18,7 +18,7 @@ impl ModuleImpl for SepModule {
   }
 }
 
-const SEP: Color = Color::from_hex(0x888888);
+const SEP: Color = Color::from_hex(0x222222);
 
 pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
   (
