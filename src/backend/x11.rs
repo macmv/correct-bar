@@ -144,7 +144,7 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
     // this list must be in same order than `Cw` enum order
     value_list:   &[
       x::Cw::BackPixel(0x222222),
-      x::Cw::EventMask(x::EventMask::EXPOSURE | x::EventMask::KEY_PRESS),
+      x::Cw::EventMask(x::EventMask::EXPOSURE | x::EventMask::BUTTON_PRESS),
     ],
   }))?;
 
@@ -248,6 +248,9 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
     loop {
       match conn.wait_for_event().unwrap() {
         xcb::Event::X(x::Event::Expose(_)) => b2.lock().render(),
+        xcb::Event::X(x::Event::ButtonPress(ev)) => {
+          b2.lock().click(ev.event_x().try_into().unwrap(), ev.event_y().try_into().unwrap())
+        }
         xcb::Event::X(x::Event::ClientMessage(ev)) => {
           // We have received a message from the server
           if let x::ClientMessageData::Data32([atom, ..]) = ev.data() {

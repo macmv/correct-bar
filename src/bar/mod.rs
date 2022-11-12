@@ -11,6 +11,7 @@ pub use module::{Module, ModuleImpl, Padding, Updater};
 pub use window::{DynamicBuffer, Window};
 
 use crate::config::Config;
+use std::fmt;
 
 pub struct Bar {
   config:  Config,
@@ -34,6 +35,19 @@ struct PositionedModule {
 
   stale_width:   bool,
   stale_content: bool,
+
+  click_regions: Vec<ClickRegion>,
+}
+
+struct ClickRegion {
+  region: Rect,
+  func:   Box<dyn Fn() + Send + Sync>,
+}
+
+impl fmt::Debug for ClickRegion {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("ClickRegion").field("region", &self.region).finish()
+  }
 }
 
 impl PositionedModule {
@@ -44,10 +58,18 @@ impl PositionedModule {
       buffer: DynamicBuffer::new(height, background),
       stale_width: true,
       stale_content: true,
+      click_regions: vec![],
     }
   }
 
   pub fn width(&self, _config: &Config) -> u32 { self.buffer.width() }
+  pub fn on_click(&self, pos: Pos) {
+    for region in &self.click_regions {
+      if pos.within(region.region) {
+        (region.func)();
+      }
+    }
+  }
 }
 
 pub trait Backend {
@@ -92,38 +114,22 @@ impl Bar {
       };
     }
 
-    if self.modules.left.iter().any(|m| m.stale_width) {
-      let mut pos = 0;
-      for module in &mut self.modules.left {
-        module.pos = pos;
-        module.stale_width = false;
-        pos += module.width(&self.config);
-      }
-    }
-    if self.modules.middle.iter().any(|m| m.stale_width) {
-      let width: u32 = self.modules.middle.iter().map(|m| m.buffer.width()).sum();
-      let mut pos = self.window.width() / 2 - width / 2;
-      for module in self.modules.middle.iter_mut() {
-        module.pos = pos;
-        module.stale_width = false;
-        copy_module!(module);
-        pos += module.width(&self.config);
-      }
-    }
-    if self.modules.right.iter().any(|m| m.stale_width) {
-      let mut pos = self.window.width();
-      for module in self.modules.right.iter_mut().rev() {
-        pos -= module.width(&self.config);
-        module.pos = pos;
-        module.stale_width = false;
-        copy_module!(module);
-      }
-    }
+    self.update_stale_positions();
     copy_modules!(self.modules.left);
     copy_modules!(self.modules.middle);
     copy_modules!(self.modules.right);
 
     self.backend.render(&self.window);
+  }
+
+  pub fn click(&mut self, x: u32, y: u32) {
+    self.update_stale_positions();
+    for module in self.modules() {
+      if x >= module.pos && x <= module.pos + module.buffer.width() {
+        module.on_click(Pos { x, y });
+        return;
+      }
+    }
   }
 
   pub fn all_modules(&self) -> impl Iterator<Item = (ModuleKey, &Module)> { self.modules.iter() }
@@ -142,6 +148,39 @@ impl Bar {
     module.stale_content = true;
     if module.buffer.width() != old_width {
       module.stale_width = true;
+    }
+  }
+
+  fn modules(&self) -> impl Iterator<Item = &PositionedModule> {
+    self.modules.left.iter().chain(self.modules.middle.iter()).chain(self.modules.right.iter())
+  }
+
+  /// Updates all modules that have a stale width.
+  fn update_stale_positions(&mut self) {
+    if self.modules.left.iter().any(|m| m.stale_width) {
+      let mut pos = 0;
+      for module in &mut self.modules.left {
+        module.pos = pos;
+        module.stale_width = false;
+        pos += module.width(&self.config);
+      }
+    }
+    if self.modules.middle.iter().any(|m| m.stale_width) {
+      let width: u32 = self.modules.middle.iter().map(|m| m.buffer.width()).sum();
+      let mut pos = self.window.width() / 2 - width / 2;
+      for module in self.modules.middle.iter_mut() {
+        module.pos = pos;
+        module.stale_width = false;
+        pos += module.width(&self.config);
+      }
+    }
+    if self.modules.right.iter().any(|m| m.stale_width) {
+      let mut pos = self.window.width();
+      for module in self.modules.right.iter_mut().rev() {
+        pos -= module.width(&self.config);
+        module.pos = pos;
+        module.stale_width = false;
+      }
     }
   }
 }

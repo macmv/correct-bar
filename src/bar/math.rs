@@ -13,6 +13,15 @@ pub struct Rect {
   pub height: u32,
 }
 
+impl Pos {
+  pub fn within(&self, rect: Rect) -> bool {
+    self.x >= rect.left()
+      && self.y >= rect.top()
+      && self.x <= rect.right()
+      && self.y <= rect.bottom()
+  }
+}
+
 impl Rect {
   pub fn left(&self) -> u32 { self.pos.x }
   pub fn right(&self) -> u32 { self.pos.x + self.width }
