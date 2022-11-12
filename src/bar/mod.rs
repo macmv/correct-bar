@@ -137,6 +137,7 @@ impl Bar {
     module.buffer.fill_and_set_background(background);
     let old_width = module.buffer.width();
     let mut ctx = RenderContext::new(
+      &self.config,
       module.module.imp().padding_override().unwrap_or(self.config.padding),
       &mut self.window,
       &mut module.buffer,

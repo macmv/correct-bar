@@ -1,5 +1,8 @@
 use super::{ClickRegion, Color, DynamicBuffer, Padding, Window};
-use crate::math::{Pos, Rect};
+use crate::{
+  config::Config,
+  math::{Pos, Rect},
+};
 
 pub struct RenderContext<'a> {
   padding:       Padding,
@@ -7,23 +10,43 @@ pub struct RenderContext<'a> {
   buffer:        &'a mut DynamicBuffer,
   click_regions: &'a mut Vec<ClickRegion>,
 
+  font_size:  f32,
+  font_scale: f32,
+
   pub(super) pos: u32,
 }
 
 impl<'a> RenderContext<'a> {
   pub(super) fn new(
+    config: &Config,
     padding: Padding,
     window: &'a mut Window,
     buffer: &'a mut DynamicBuffer,
     click_regions: &'a mut Vec<ClickRegion>,
   ) -> Self {
-    RenderContext { padding, window, buffer, click_regions, pos: padding.left }
+    RenderContext {
+      padding,
+      window,
+      buffer,
+      click_regions,
+      font_size: config.font_size,
+      font_scale: 1.0,
+      pos: padding.left,
+    }
   }
 
   /// Returns the current cursor.
   pub fn pos(&self) -> Pos { Pos { x: self.pos, y: 0 } }
   /// Returns the height of the bar.
   pub fn height(&self) -> u32 { self.window.height() }
+
+  /// Sets the multiplier for the font size. All future `draw_text` and
+  /// `advance_text` calls will multiply this number into the font size they
+  /// use.
+  pub fn set_font_scale(&mut self, scale: f32) { self.font_scale = scale }
+
+  /// Returns the font size multiplied by the current font scale.
+  pub fn effective_font_size(&self) -> f32 { self.font_size * self.font_scale }
 
   /// Returns the padding on this module.
   pub fn padding(&self) -> Padding { self.padding }
@@ -49,7 +72,9 @@ impl<'a> RenderContext<'a> {
   /// Advances the text drawing by the width of the given text. This can be used
   /// to add a space which is the width of some text.
   pub fn advance_text(&mut self, text: &str) -> Rect {
-    let rect = self.buffer.layout_text(self.window.font_mut(), Pos { x: self.pos, y: 0 }, text);
+    let size = self.effective_font_size();
+    let rect =
+      self.buffer.layout_text(self.window.font_mut(), Pos { x: self.pos, y: 0 }, text, size);
     self.advance_by(rect.width);
     rect.with_height(self.window.height())
   }
@@ -57,8 +82,9 @@ impl<'a> RenderContext<'a> {
   /// Draws the given text, and advances the cursor by the width of the text.
   /// Returns the rectangle of the drawn text.
   pub fn draw_text(&mut self, text: &str, color: Color) -> Rect {
+    let size = self.effective_font_size();
     let rect =
-      self.buffer.draw_text(self.window.font_mut(), Pos { x: self.pos, y: 0 }, text, color);
+      self.buffer.draw_text(self.window.font_mut(), Pos { x: self.pos, y: 0 }, text, size, color);
     self.advance_by(rect.width);
     rect.with_height(self.window.height())
   }

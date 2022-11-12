@@ -141,10 +141,14 @@ impl DynamicBuffer {
     }
   }
 
-  const SCALE: f32 = 48.0;
-
-  pub fn layout_text(&mut self, font: &mut FontWithCache, pos: Pos, text: &str) -> Rect {
-    let scale = Scale::uniform(Self::SCALE);
+  pub fn layout_text(
+    &mut self,
+    font: &mut FontWithCache,
+    pos: Pos,
+    text: &str,
+    font_size: f32,
+  ) -> Rect {
+    let scale = Scale::uniform(font_size);
     let mut last_glyph = None;
     let mut caret = 0.0;
     for c in text.chars() {
@@ -165,13 +169,14 @@ impl DynamicBuffer {
     font: &mut FontWithCache,
     pos: Pos,
     text: &str,
+    font_size: f32,
     color: Color,
   ) -> Rect {
-    let rect = self.layout_text(font, pos, text);
+    let rect = self.layout_text(font, pos, text, font_size);
 
     self.resize(pos.x + rect.width);
 
-    let scale = Scale::uniform(Self::SCALE);
+    let scale = Scale::uniform(font_size);
     let mut last_glyph = None;
     let mut caret = 0.0;
     for c in text.chars() {

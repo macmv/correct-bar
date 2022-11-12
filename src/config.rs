@@ -6,6 +6,8 @@ pub struct Config {
   pub background: Color,
   /// Default padding on every module.
   pub padding:    Padding,
+  /// Default font size.
+  pub font_size:  f32,
 
   pub modules_left:   Vec<Module>,
   pub modules_middle: Vec<Module>,
