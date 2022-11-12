@@ -86,12 +86,9 @@ pub enum ModuleKey {
 
 impl Bar {
   pub fn from_config(mut config: Config, backend: impl Backend + Send + Sync + 'static) -> Self {
-    Bar {
-      window: Window::new(config.window.width, config.window.height),
-      backend: Box::new(backend),
-      modules: Modules::from_config(&mut config),
-      config,
-    }
+    let mut window = Window::new(config.window.width, config.window.height);
+    window.buffer_mut().fill(config.background);
+    Bar { window, backend: Box::new(backend), modules: Modules::from_config(&mut config), config }
   }
 
   pub fn window(&self) -> &Window { &self.window }
