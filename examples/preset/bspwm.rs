@@ -9,7 +9,7 @@ use std::{
 #[derive(Clone)]
 pub struct BSPWMModule {
   bspwm:   BSPWM,
-  channel: Option<Receiver<()>>,
+  channel: Receiver<()>,
 }
 
 #[derive(Clone)]
@@ -34,7 +34,7 @@ impl BSPWMModule {
         line.clear();
       }
     });
-    BSPWMModule { bspwm, channel: Some(rx) }
+    BSPWMModule { bspwm, channel: rx }
   }
 }
 
@@ -61,19 +61,55 @@ impl BSPWM {
 }
 
 impl ModuleImpl for BSPWMModule {
-  fn updater(&self) -> Updater { Updater::Channel(self.channel.as_ref().unwrap().clone()) }
+  fn updater(&self) -> Updater { Updater::Channel(self.channel.clone()) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
-    {
-      let res = self.bspwm.send_immediate::<json::Desktop>(&["query", "-T", "-d"]);
-      println!("{res:?}");
+    let state = self.bspwm.send_immediate::<json::WmState>(&["wm", "-d"]).unwrap();
+    let mut i = 0;
+    for monitor in &state.monitors {
+      for desktop in &monitor.desktops {
+        if i != 0 {
+          ctx.advance_text(" ");
+        }
+        let is_focused = desktop.id == monitor.focused_desktop_id;
+        ctx.draw_text(
+          &desktop.name,
+          if is_focused { Color::from_hex(0x00ffff) } else { Color::white() },
+        );
+        i += 1;
+      }
     }
-    ctx.draw_text("hello", Color::white());
   }
 }
 
 #[allow(unused)]
 mod json {
   use serde::Deserialize;
+
+  #[derive(Clone, Debug, Deserialize)]
+  #[serde(rename_all = "camelCase")]
+  pub struct WmState {
+    pub focused_monitor_id: u32,
+    pub clients_count:      u32,
+    pub monitors:           Vec<Monitor>,
+    // There's a couple other fields, but I don't care about them (things like switch history) so
+    // I'm going to leave them out for now.
+  }
+
+  #[derive(Clone, Debug, Deserialize)]
+  #[serde(rename_all = "camelCase")]
+  pub struct Monitor {
+    pub name:               String,
+    pub id:                 u32,
+    pub randr_id:           u32,
+    pub wired:              bool,
+    pub sticky_count:       u32,
+    pub window_gap:         u32,
+    pub border_width:       u32,
+    pub focused_desktop_id: u32,
+    pub padding:            Padding,
+    pub rectangle:          Rectangle,
+    pub desktops:           Vec<Desktop>,
+  }
 
   #[derive(Clone, Debug, Deserialize)]
   #[serde(rename_all = "camelCase")]
@@ -92,43 +128,43 @@ mod json {
   #[derive(Clone, Debug, Deserialize)]
   #[serde(rename_all = "camelCase")]
   pub struct Node {
-    id:           u32,
-    split_type:   SplitType,
-    split_ratio:  f64,
-    vacant:       bool,
-    hidden:       bool,
-    sticky:       bool,
-    private:      bool,
-    locked:       bool,
-    marked:       bool,
-    rectangle:    Rectangle,
-    constraints:  Constraints,
-    first_child:  Option<Box<Node>>,
-    second_child: Option<Box<Node>>,
-    client:       Option<Window>,
+    pub id:           u32,
+    pub split_type:   SplitType,
+    pub split_ratio:  f64,
+    pub vacant:       bool,
+    pub hidden:       bool,
+    pub sticky:       bool,
+    pub private:      bool,
+    pub locked:       bool,
+    pub marked:       bool,
+    pub rectangle:    Rectangle,
+    pub constraints:  Constraints,
+    pub first_child:  Option<Box<Node>>,
+    pub second_child: Option<Box<Node>>,
+    pub client:       Option<Window>,
   }
 
   #[derive(Clone, Debug, Deserialize)]
   #[serde(rename_all = "snake_case")]
   pub struct Constraints {
-    min_width:  u32,
-    min_height: u32,
+    pub min_width:  u32,
+    pub min_height: u32,
   }
 
   #[derive(Clone, Debug, Deserialize)]
   #[serde(rename_all = "camelCase")]
   pub struct Window {
-    class_name:         String,
-    instance_name:      String,
-    border_width:       u32,
-    state:              WindowState,
-    last_state:         WindowState,
-    layer:              Layer,
-    last_layer:         Layer,
-    urgent:             bool,
-    shown:              bool,
-    tiled_rectangle:    Rectangle,
-    floating_rectangle: Rectangle,
+    pub class_name:         String,
+    pub instance_name:      String,
+    pub border_width:       u32,
+    pub state:              WindowState,
+    pub last_state:         WindowState,
+    pub layer:              Layer,
+    pub last_layer:         Layer,
+    pub urgent:             bool,
+    pub shown:              bool,
+    pub tiled_rectangle:    Rectangle,
+    pub floating_rectangle: Rectangle,
   }
 
   #[derive(Clone, Debug, Deserialize)]
