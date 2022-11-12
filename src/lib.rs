@@ -49,6 +49,7 @@ pub fn run(config: Config) {
         sel.recv(chan);
       });
       let idx = sel.ready();
+      while let Ok(_) = channel_modules[idx].1.try_recv() {}
       let mut b = bar.lock();
       b.update_module(channel_modules[idx].0);
       b.render();
