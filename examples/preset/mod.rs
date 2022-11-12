@@ -2,7 +2,7 @@ pub mod desktop;
 pub mod laptop;
 
 use chrono::{Datelike, Timelike};
-use correct_bar::bar::{Color, Module, ModuleImpl, Rect, Updater};
+use correct_bar::bar::{Color, Module, ModuleImpl, Padding, Rect, Updater};
 use parking_lot::Mutex;
 use std::time::Duration;
 use sysinfo::{CpuExt, SystemExt};
@@ -10,6 +10,7 @@ use sysinfo::{CpuExt, SystemExt};
 struct SepModule;
 
 impl ModuleImpl for SepModule {
+  fn padding_override(&self) -> Option<Padding> { Some(Padding::none()) }
   fn updater(&self) -> Updater { Updater::Never }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     ctx.draw_rect(Rect { pos: ctx.pos(), width: 2, height: ctx.height() }, SEP);

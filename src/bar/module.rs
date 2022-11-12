@@ -6,6 +6,17 @@ pub struct Module {
   imp: Box<dyn ModuleImpl + Send + Sync>,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Padding {
+  pub left:   u32,
+  pub right:  u32,
+  pub top:    u32,
+  pub bottom: u32,
+}
+impl Padding {
+  pub fn none() -> Self { Padding::default() }
+}
+
 pub struct TextModule {
   text:       &'static str,
   background: Option<Color>,
@@ -51,6 +62,7 @@ pub enum Updater {
 }
 
 pub trait ModuleImpl {
+  fn padding_override(&self) -> Option<Padding> { None }
   fn background(&self) -> Option<Color> { None }
   fn render(&self, ctx: &mut RenderContext);
   fn updater(&self) -> Updater;

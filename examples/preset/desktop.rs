@@ -1,4 +1,7 @@
-use correct_bar::config::{Config, WindowConfig};
+use correct_bar::{
+  bar::Padding,
+  config::{Config, WindowConfig},
+};
 
 pub fn run() {
   let (modules_left, modules_middle, modules_right) = super::modules();
@@ -15,6 +18,7 @@ pub fn run() {
     modules_left,
     modules_middle,
     modules_right,
+    padding: Padding { left: 10, right: 10, top: 0, bottom: 0 },
     ..Default::default()
   };
   correct_bar::run(config)

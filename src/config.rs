@@ -1,9 +1,11 @@
-use crate::bar::{Color, Module};
+use crate::bar::{Color, Module, Padding};
 
 #[derive(Default)]
 pub struct Config {
   pub window:     WindowConfig,
   pub background: Color,
+  /// Default padding on every module.
+  pub padding:    Padding,
 
   pub modules_left:   Vec<Module>,
   pub modules_middle: Vec<Module>,
