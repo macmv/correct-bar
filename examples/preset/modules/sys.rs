@@ -2,7 +2,7 @@ use chrono::{Datelike, Timelike};
 use correct_bar::bar::{Color, ModuleImpl, Updater};
 use parking_lot::Mutex;
 use std::time::Duration;
-use sysinfo::{CpuExt, CpuRefreshKind, RefreshKind, SystemExt};
+use sysinfo::{ComponentExt, CpuExt, CpuRefreshKind, RefreshKind, SystemExt};
 
 pub struct Time {
   pub primary:   Color,
@@ -39,10 +39,36 @@ impl ModuleImpl for Time {
   }
 }
 
+pub struct Temp {
+  sys: Mutex<sysinfo::System>,
+}
+impl Temp {
+  pub fn new() -> Self {
+    Temp {
+      sys: Mutex::new(sysinfo::System::new_with_specifics(
+        RefreshKind::new().with_components_list(),
+      )),
+    }
+  }
+}
+impl ModuleImpl for Temp {
+  fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
+  fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
+    let mut sys = self.sys.lock();
+    sys.refresh_all();
+
+    for c in sys.components() {
+      if c.label() == "k10temp Tccd1" {
+        ctx.draw_text(&format!("{:>2.00}°", c.temperature()), Color::from_hex(0xff6600));
+        break;
+      }
+    }
+  }
+}
+
 pub struct Cpu {
   sys: Mutex<sysinfo::System>,
 }
-
 impl Cpu {
   pub fn new() -> Self {
     Cpu {
@@ -52,12 +78,12 @@ impl Cpu {
     }
   }
 }
-
 impl ModuleImpl for Cpu {
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     let mut sys = self.sys.lock();
     sys.refresh_all();
+
     ctx.draw_text(
       &format!(
         "{:>2.00}%",
@@ -69,27 +95,32 @@ impl ModuleImpl for Cpu {
 }
 
 pub struct Mem {
-  sys: Mutex<sysinfo::System>,
+  pub primary:   Color,
+  pub secondary: Color,
+  sys:           Mutex<sysinfo::System>,
 }
-
 impl Mem {
-  pub fn new() -> Self {
-    Mem { sys: Mutex::new(sysinfo::System::new_with_specifics(RefreshKind::new().with_memory())) }
+  pub fn new(primary: Color, secondary: Color) -> Self {
+    Mem {
+      primary,
+      secondary,
+      sys: Mutex::new(sysinfo::System::new_with_specifics(RefreshKind::new().with_memory())),
+    }
   }
 }
-
 impl ModuleImpl for Mem {
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     let mut sys = self.sys.lock();
     sys.refresh_all();
     ctx.draw_text(
-      &format!(
-        "{:>5.02} / {:>5.02}",
-        sys.used_memory() as f64 / (1024 * 1024 * 1024) as f64,
-        sys.total_memory() as f64 / (1024 * 1024 * 1024) as f64,
-      ),
-      Color::from_hex(0xffff00),
+      &format!("{:>5.02}G", sys.used_memory() as f64 / (1024 * 1024 * 1024) as f64),
+      self.primary,
+    );
+    ctx.draw_text(" / ", self.secondary);
+    ctx.draw_text(
+      &format!("{:>5.02}G", sys.total_memory() as f64 / (1024 * 1024 * 1024) as f64),
+      self.primary,
     );
   }
 }
