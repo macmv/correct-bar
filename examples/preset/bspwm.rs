@@ -1,69 +1,79 @@
 use correct_bar::bar::{Color, ModuleImpl, Updater};
 use crossbeam_channel::Receiver;
+use parking_lot::Mutex;
 use std::{
   io::{prelude::*, BufReader},
   os::unix::net::UnixStream,
+  sync::Arc,
   thread,
 };
 
 #[derive(Clone)]
 pub struct BSPWMModule {
-  bspwm:   BSPWM,
+  path:    String,
   channel: Receiver<()>,
+  state:   Arc<Mutex<json::WmState>>,
 }
 
-#[derive(Clone)]
-struct BSPWM {
-  path: String,
-}
+fn parse_hex(s: &str) -> u32 { u32::from_str_radix(&s[2..], 16).unwrap() }
 
 impl BSPWMModule {
   pub fn new() -> Self { BSPWMModule::new_at("/tmp/bspwm_0_0-socket") }
   pub fn new_at(path: &str) -> Self {
-    let bspwm = BSPWM { path: path.into() };
+    let state = send_immediate::<json::WmState>(path, &["wm", "-d"]).unwrap();
+    let state = Arc::new(Mutex::new(state));
 
     let (tx, rx) = crossbeam_channel::bounded(16);
-    let b = bspwm.clone();
+    let s = state.clone();
+    let p = path.to_string();
     thread::spawn(move || {
-      let mut socket = BufReader::new(b.send_blocking(&["subscribe", "desktop"]));
+      let mut socket = BufReader::new(send_blocking(&p, &["subscribe", "desktop"]));
       let mut line = String::new();
       loop {
         socket.read_line(&mut line).unwrap();
-        println!("{line}");
+        let mut sections = line.trim().split(" ");
+        match sections.next() {
+          Some("desktop_focus") => {
+            let monitor = parse_hex(sections.next().unwrap());
+            let desktop = parse_hex(sections.next().unwrap());
+            let mut state = s.lock();
+            state.focused_monitor_id = monitor;
+            state.monitor_mut(monitor).focused_desktop_id = desktop;
+          }
+          _ => {}
+        }
         tx.send(()).unwrap();
         line.clear();
       }
     });
-    BSPWMModule { bspwm, channel: rx }
+    BSPWMModule { path: path.into(), channel: rx, state }
   }
 }
 
-impl BSPWM {
-  fn open_socket(&self) -> UnixStream { UnixStream::connect(&self.path).unwrap() }
-  fn send_blocking(&self, args: &[&str]) -> UnixStream {
-    let mut socket = self.open_socket();
-    for arg in args {
-      socket.write(arg.as_bytes()).unwrap();
-      socket.write(&[0x00]).unwrap();
-    }
-    socket
+fn open_socket(path: &str) -> UnixStream { UnixStream::connect(path).unwrap() }
+fn send_blocking(path: &str, args: &[&str]) -> UnixStream {
+  let mut socket = open_socket(path);
+  for arg in args {
+    socket.write(arg.as_bytes()).unwrap();
+    socket.write(&[0x00]).unwrap();
   }
-  fn send_immediate<T: serde::de::DeserializeOwned>(&self, args: &[&str]) -> Result<T, String> {
-    let mut socket = self.send_blocking(args);
-    let mut buf = vec![];
-    socket.read_to_end(&mut buf).unwrap();
-    if buf[0] == 0x07 {
-      Err(String::from_utf8(buf[1..].to_vec()).unwrap())
-    } else {
-      Ok(serde_json::from_str(std::str::from_utf8(&buf).unwrap()).unwrap())
-    }
+  socket
+}
+fn send_immediate<T: serde::de::DeserializeOwned>(path: &str, args: &[&str]) -> Result<T, String> {
+  let mut socket = send_blocking(path, args);
+  let mut buf = vec![];
+  socket.read_to_end(&mut buf).unwrap();
+  if buf[0] == 0x07 {
+    Err(String::from_utf8(buf[1..].to_vec()).unwrap())
+  } else {
+    Ok(serde_json::from_str(std::str::from_utf8(&buf).unwrap()).unwrap())
   }
 }
 
 impl ModuleImpl for BSPWMModule {
   fn updater(&self) -> Updater { Updater::Channel(self.channel.clone()) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
-    let state = self.bspwm.send_immediate::<json::WmState>(&["wm", "-d"]).unwrap();
+    let state = self.state.lock();
     let mut i = 0;
     for monitor in &state.monitors {
       for desktop in &monitor.desktops {
@@ -93,6 +103,25 @@ mod json {
     pub monitors:           Vec<Monitor>,
     // There's a couple other fields, but I don't care about them (things like switch history) so
     // I'm going to leave them out for now.
+  }
+
+  impl WmState {
+    pub fn monitor(&self, id: u32) -> &Monitor {
+      for monitor in &self.monitors {
+        if monitor.id == id {
+          return monitor;
+        }
+      }
+      panic!("no monitor with id {id:#x}");
+    }
+    pub fn monitor_mut(&mut self, id: u32) -> &mut Monitor {
+      for monitor in &mut self.monitors {
+        if monitor.id == id {
+          return monitor;
+        }
+      }
+      panic!("no monitor with id {id:#x}");
+    }
   }
 
   #[derive(Clone, Debug, Deserialize)]
