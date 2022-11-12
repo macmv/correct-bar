@@ -26,6 +26,8 @@ pub fn run(config: Config) {
             if duration < dur {
               sleep_duration = Some(duration);
             }
+          } else {
+            sleep_duration = Some(duration);
           }
           sleep_modules.push(key);
         }

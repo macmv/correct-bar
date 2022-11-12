@@ -67,7 +67,6 @@ impl Bar {
 
   pub fn all_modules(&self) -> impl Iterator<Item = (ModuleKey, &Module)> { self.modules.iter() }
   pub fn update_module(&mut self, key: ModuleKey) {
-    println!("updating");
     /*
     let module = self.modules.by_key_mut(key);
     let mut ctx = RenderContext::new(&mut module.buffer, Pos { x: module.pos, y: 20 });
