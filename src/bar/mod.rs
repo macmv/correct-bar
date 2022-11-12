@@ -65,8 +65,9 @@ impl PositionedModule {
 
   pub fn width(&self, _config: &Config) -> u32 { self.buffer.width() }
   pub fn on_click(&self, pos: Pos) {
+    let module_pos = Pos { x: pos.x - self.pos, y: pos.y };
     for region in &self.click_regions {
-      if pos.within(region.region) {
+      if module_pos.within(region.region) {
         (region.func)();
       }
     }

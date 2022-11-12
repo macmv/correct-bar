@@ -14,6 +14,15 @@ pub struct Rect {
 }
 
 impl Pos {
+  pub fn with_x(mut self, x: u32) -> Self {
+    self.x = x;
+    self
+  }
+  pub fn with_y(mut self, y: u32) -> Self {
+    self.y = y;
+    self
+  }
+
   pub fn within(&self, rect: Rect) -> bool {
     self.x >= rect.left()
       && self.y >= rect.top()
@@ -28,6 +37,14 @@ impl Rect {
   pub fn top(&self) -> u32 { self.pos.y }
   pub fn bottom(&self) -> u32 { self.pos.y + self.height }
 
+  pub fn with_x(mut self, x: u32) -> Self {
+    self.pos.x = x;
+    self
+  }
+  pub fn with_y(mut self, y: u32) -> Self {
+    self.pos.y = y;
+    self
+  }
   pub fn with_width(mut self, width: u32) -> Self {
     self.width = width;
     self

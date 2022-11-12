@@ -35,11 +35,31 @@ impl ModuleImpl for Time {
     ctx.draw_text(" or ", self.secondary);
     let utc_rect = draw_time!(utc);
 
-    fn copy_time<T: chrono::TimeZone>(time: chrono::DateTime<T>) {}
+    fn copy(str: String) {
+      use std::{
+        io::Write,
+        process::{Command, Stdio},
+      };
+      Command::new("notify-send").arg(format!("Copying {str}")).output().unwrap();
+
+      let mut child =
+        Command::new("xclip").stdin(Stdio::piped()).arg("-sel").arg("clip").spawn().unwrap();
+      let mut stdin = child.stdin.take().unwrap();
+      stdin.write_all(str.as_bytes()).unwrap();
+      // Close stdin before waiting
+      drop(stdin);
+      child.wait().unwrap();
+    }
 
     if ctx.needs_click_regions() {
-      ctx.add_on_click(local_rect, move || copy_time(chrono::Local::now()));
-      ctx.add_on_click(utc_rect, move || copy_time(chrono::Utc::now()));
+      ctx.add_on_click(local_rect, move || {
+        let now = chrono::Local::now();
+        copy(format!("{:02}:{:02}:{:02}", now.hour(), now.minute(), now.second()));
+      });
+      ctx.add_on_click(utc_rect, move || {
+        let now = chrono::Local::now();
+        copy(now.timestamp().to_string())
+      });
     }
   }
 }

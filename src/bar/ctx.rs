@@ -76,7 +76,7 @@ impl<'a> RenderContext<'a> {
     let pos = Pos { x: self.pos, y: self.window.height() - 5 };
     let rect = self.buffer.layout_text(self.window.font_mut(), pos, text, size);
     self.advance_by(rect.width);
-    rect.with_height(self.window.height())
+    rect.with_y(0).with_height(self.window.height())
   }
 
   /// Draws the given text, and advances the cursor by the width of the text.
@@ -86,7 +86,7 @@ impl<'a> RenderContext<'a> {
     let pos = Pos { x: self.pos, y: self.window.height() - 5 };
     let rect = self.buffer.draw_text(self.window.font_mut(), pos, text, size, color);
     self.advance_by(rect.width);
-    rect.with_height(self.window.height())
+    rect.with_y(0).with_height(self.window.height())
   }
 
   /// Draws the given rectangle. This will not advance the cursor.
