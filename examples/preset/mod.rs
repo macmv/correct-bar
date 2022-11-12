@@ -15,21 +15,23 @@ impl ModuleImpl for TimeModule {
   }
 }
 
+fn sep() -> impl ModuleImpl { Module::text(" | ", Color { r: 100, g: 100, b: 100 }) }
+
 pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
   (
     vec![
       Module::text("foo", Color { r: 255, g: 255, b: 128 }).into(),
-      Module::text(" | ", Color { r: 100, g: 100, b: 100 }).into(),
+      sep().into(),
       Module::text("100%", Color { r: 100, g: 255, b: 128 }).into(),
     ],
     vec![
       Module::text("HELLO WORLD", Color { r: 255, g: 255, b: 128 }).into(),
-      Module::text(" | ", Color { r: 100, g: 100, b: 100 }).into(),
+      sep().into(),
       Module::text("foo and stuff", Color { r: 100, g: 255, b: 128 }).into(),
     ],
     vec![
       Module::text("mmm things", Color { r: 255, g: 100, b: 128 }).into(),
-      Module::text(" | ", Color { r: 100, g: 100, b: 100 }).into(),
+      sep().into(),
       Module::text("time here", Color { r: 100, g: 255, b: 128 }).into(),
       Module::from(TimeModule).into(),
     ],
