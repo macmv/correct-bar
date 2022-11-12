@@ -22,6 +22,9 @@ impl<'a> RenderContext<'a> {
   /// Returns the height of the bar.
   pub fn height(&self) -> u32 { self.window.height() }
 
+  /// Returns the padding on this module.
+  pub fn padding(&self) -> Padding { self.padding }
+
   /// Advances the cursor by the given number of pixels.
   pub fn advance_by(&mut self, pixels: u32) {
     self.pos += pixels;
