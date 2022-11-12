@@ -6,9 +6,6 @@ use correct_bar::{
   bar::{Color, Module, ModuleImpl, Padding, Updater},
   math::Rect,
 };
-use parking_lot::Mutex;
-use std::time::Duration;
-use sysinfo::{CpuExt, SystemExt};
 
 struct SepModule;
 
@@ -18,40 +15,6 @@ impl ModuleImpl for SepModule {
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     ctx.draw_rect(Rect { pos: ctx.pos(), width: 2, height: ctx.height() }, SEP);
     ctx.advance_by(2);
-  }
-}
-
-struct CpuMemModule {
-  sys: Mutex<sysinfo::System>,
-}
-
-impl CpuMemModule {
-  pub fn new() -> Self { CpuMemModule { sys: Mutex::new(sysinfo::System::new_all()) } }
-}
-
-impl ModuleImpl for CpuMemModule {
-  fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
-  fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
-    let mut sys = self.sys.lock();
-    sys.refresh_all();
-    ctx.draw_text(
-      &format!(
-        "{:>5.02} / {:>5.02}",
-        sys.used_memory() as f64 / (1024 * 1024 * 1024) as f64,
-        sys.total_memory() as f64 / (1024 * 1024 * 1024) as f64,
-      ),
-      Color::from_hex(0xffff00),
-    );
-    ctx.advance_by(ctx.padding().left);
-    ctx.draw_rect(Rect { pos: ctx.pos(), width: 2, height: ctx.height() }, SEP);
-    ctx.advance_by(ctx.padding().right + 2);
-    ctx.draw_text(
-      &format!(
-        "{:>2.00}%",
-        sys.cpus().iter().map(|c| c.cpu_usage()).sum::<f32>() / sys.cpus().len() as f32,
-      ),
-      Color::from_hex(0xff0000),
-    );
   }
 }
 
@@ -72,7 +35,7 @@ pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
     vec![
       Module::text("mmm things", Color { r: 255, g: 100, b: 128 }).into(),
       SepModule.into(),
-      CpuMemModule::new().into(),
+      modules::CpuMem::new().into(),
       SepModule.into(),
       modules::Time { primary: Color::white(), secondary: SEP }.into(),
     ],
