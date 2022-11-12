@@ -10,7 +10,6 @@ pub struct Time {
 }
 
 impl ModuleImpl for Time {
-  fn background(&self) -> Option<Color> { Some(Color::from_hex(0x001122)) }
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     let local = chrono::Local::now();
