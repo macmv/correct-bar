@@ -1,6 +1,6 @@
 use super::{Color, Pos, Rect};
 use rusttype::{Font, GlyphId, Point, Scale, ScaledGlyph};
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 pub struct Window {
   buf:  Buffer,
@@ -98,11 +98,24 @@ impl AlphaBuffer {
   }
 }
 
+impl fmt::Debug for DynamicBuffer {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("DynamicBuffer")
+      .field("width", &self.buf.width)
+      .field("height", &self.buf.height)
+      .finish()
+  }
+}
+
 impl DynamicBuffer {
   pub fn new(height: u32, background: Color) -> Self {
     DynamicBuffer { buf: Buffer::new(0, height), background }
   }
 
+  #[inline]
+  pub fn width(&self) -> u32 { self.buf.width }
+  #[inline]
+  pub fn height(&self) -> u32 { self.buf.height }
   pub fn buffer(&self) -> &Buffer { &self.buf }
   pub fn buffer_mut(&mut self) -> &mut Buffer { &mut self.buf }
 

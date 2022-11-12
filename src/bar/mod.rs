@@ -26,16 +26,16 @@ pub struct Modules {
   right:  Vec<PositionedModule>,
 }
 
+#[derive(Debug)]
 struct PositionedModule {
   module: Module,
   pos:    u32,
-  width:  u32,
   buffer: DynamicBuffer,
 }
 
 impl PositionedModule {
   pub fn new(module: Module, height: u32, background: Color) -> PositionedModule {
-    PositionedModule { module, pos: 0, width: 0, buffer: DynamicBuffer::new(height, background) }
+    PositionedModule { module, pos: 0, buffer: DynamicBuffer::new(height, background) }
   }
 }
 
@@ -81,16 +81,46 @@ impl Bar {
   }
 
   fn update_all(&mut self) {
+    macro_rules! draw_module {
+      ( $module:expr ) => {{
+        let background = $module.module.imp().background().unwrap_or(self.background);
+        $module.buffer.fill_and_set_background(background);
+        let mut ctx =
+          RenderContext::new(&mut self.window, &mut $module.buffer, Pos { x: $module.pos, y: 20 });
+        $module.module.imp().render(&mut ctx);
+      }};
+    }
+
+    macro_rules! copy_module {
+      ( $module:expr ) => {
+        self.window.buffer_mut().copy_from(Pos { x: $module.pos, y: 0 }, &$module.buffer.buffer());
+      };
+    }
+
+    self.modules.left.iter_mut().for_each(|m| draw_module!(m));
+    self.modules.middle.iter_mut().for_each(|m| draw_module!(m));
+    self.modules.right.iter_mut().for_each(|m| draw_module!(m));
+
     let mut pos = 0;
     for module in &mut self.modules.left {
       module.pos = pos;
-      let background = module.module.imp().background().unwrap_or(self.background);
-      module.buffer.fill_and_set_background(background);
-      let mut ctx =
-        RenderContext::new(&mut self.window, &mut module.buffer, Pos { x: module.pos, y: 20 });
-      module.module.imp().render(&mut ctx);
-      self.window.buffer_mut().copy_from(Pos { x: module.pos, y: 0 }, &module.buffer.buffer());
-      pos += module.width;
+      copy_module!(module);
+      pos += module.buffer.width();
+    }
+
+    let width: u32 = self.modules.middle.iter().map(|m| m.buffer.width()).sum();
+    let mut pos = self.window.width() / 2 - width / 2;
+    for module in self.modules.middle.iter_mut() {
+      module.pos = pos;
+      copy_module!(module);
+      pos += module.buffer.width();
+    }
+
+    let mut pos = self.window.width();
+    for module in self.modules.right.iter_mut().rev() {
+      pos -= module.buffer.width();
+      module.pos = pos;
+      copy_module!(module);
     }
   }
 

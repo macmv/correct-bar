@@ -1,6 +1,6 @@
 use super::{Color, RenderContext};
 use crossbeam_channel::Receiver;
-use std::time::Duration;
+use std::{fmt, time::Duration};
 
 pub struct Module {
   imp: Box<dyn ModuleImpl + Send + Sync>,
@@ -22,6 +22,10 @@ impl TextModule {
     self.background = Some(background);
     self
   }
+}
+
+impl fmt::Debug for Module {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { f.debug_struct("Module").finish() }
 }
 
 impl Module {
