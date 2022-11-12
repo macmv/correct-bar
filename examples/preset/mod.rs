@@ -2,7 +2,7 @@ pub mod desktop;
 pub mod laptop;
 
 use chrono::{Datelike, Timelike};
-use correct_bar::bar::{Color, Module, ModuleImpl, Updater};
+use correct_bar::bar::{Color, Module, ModuleImpl, Rect, Updater};
 use parking_lot::Mutex;
 use std::time::Duration;
 use sysinfo::{CpuExt, SystemExt};
@@ -12,15 +12,15 @@ struct SepModule;
 impl ModuleImpl for SepModule {
   fn updater(&self) -> Updater { Updater::Never }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
-    let mut rect = ctx.advance_text("  ");
-    rect.resize_to(2, rect.height);
-    ctx.draw_rect(rect, SEP);
+    ctx.draw_rect(Rect { pos: ctx.pos(), width: 2, height: ctx.height() }, SEP);
+    ctx.advance_by(2);
   }
 }
 
 struct TimeModule;
 
 impl ModuleImpl for TimeModule {
+  fn background(&self) -> Option<Color> { Some(Color::from_hex(0x001122)) }
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     let local = chrono::Local::now();

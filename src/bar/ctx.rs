@@ -12,6 +12,11 @@ impl<'a> RenderContext<'a> {
     RenderContext { window, buffer, pos: 0 }
   }
 
+  /// Returns the current cursor.
+  pub fn pos(&self) -> Pos { Pos { x: self.pos, y: 0 } }
+  /// Returns the height of the bar.
+  pub fn height(&self) -> u32 { self.window.height() }
+
   /// Advances the cursor by the given number of pixels.
   pub fn advance_by(&mut self, pixels: u32) {
     self.pos += pixels;
