@@ -10,6 +10,7 @@ use std::{
 
 #[derive(Clone)]
 pub struct BSPWMModule {
+  path:    String,
   channel: Receiver<()>,
   state:   Arc<Mutex<json::WmState>>,
 }
@@ -19,7 +20,7 @@ fn parse_hex(s: &str) -> u32 { u32::from_str_radix(&s[2..], 16).unwrap() }
 impl BSPWMModule {
   pub fn new() -> Self { BSPWMModule::new_at("/tmp/bspwm_0_0-socket") }
   pub fn new_at(path: &str) -> Self {
-    let state = send_immediate::<json::WmState>(path, &["wm", "-d"]).unwrap();
+    let state = send_immediate_json::<json::WmState>(path, &["wm", "-d"]).unwrap();
     let state = Arc::new(Mutex::new(state));
 
     let (tx, rx) = crossbeam_channel::bounded(16);
@@ -45,7 +46,7 @@ impl BSPWMModule {
         line.clear();
       }
     });
-    BSPWMModule { channel: rx, state }
+    BSPWMModule { path: path.into(), channel: rx, state }
   }
 }
 
@@ -58,21 +59,42 @@ fn send_blocking(path: &str, args: &[&str]) -> UnixStream {
   }
   socket
 }
-fn send_immediate<T: serde::de::DeserializeOwned>(path: &str, args: &[&str]) -> Result<T, String> {
-  let mut socket = send_blocking(path, args);
+fn send_immediate(path: &str, args: &[&str]) -> Result<String, String> {
   let mut buf = vec![];
-  socket.read_to_end(&mut buf).unwrap();
-  if buf[0] == 0x07 {
-    Err(String::from_utf8(buf[1..].to_vec()).unwrap())
-  } else {
-    Ok(serde_json::from_str(std::str::from_utf8(&buf).unwrap()).unwrap())
+  // try 10 times
+  for _ in 0..10 {
+    buf.clear();
+    let mut socket = send_blocking(path, args);
+    match socket.read_to_end(&mut buf) {
+      Ok(_) => {
+        if !buf.is_empty() && buf[0] == 0x07 {
+          return Err(String::from_utf8(buf[1..].to_vec()).unwrap());
+        } else {
+          return Ok(String::from_utf8(buf).unwrap());
+        }
+      }
+      Err(_) => continue,
+    }
   }
+  Err("could not connect to bspwm".into())
+}
+
+fn send_immediate_json<T: serde::de::DeserializeOwned>(
+  path: &str,
+  args: &[&str],
+) -> Result<T, String> {
+  send_immediate(path, args).map(|buf| serde_json::from_str(&buf).unwrap())
+}
+
+fn switch_desktop(path: &str, desktop: u32) {
+  send_immediate(path, &["desktop", "-f", &desktop.to_string()]).unwrap();
 }
 
 impl ModuleImpl for BSPWMModule {
   fn updater(&self) -> Updater { Updater::Channel(self.channel.clone()) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     let state = self.state.lock();
+    let needs_click_regions = ctx.needs_click_regions();
     let mut i = 0;
     for monitor in &state.monitors {
       for desktop in &monitor.desktops {
@@ -80,10 +102,15 @@ impl ModuleImpl for BSPWMModule {
           ctx.advance_text(" ");
         }
         let is_focused = desktop.id == monitor.focused_desktop_id;
-        ctx.draw_text(
+        let rect = ctx.draw_text(
           &desktop.name,
           if is_focused { Color::from_hex(0x00ffff) } else { Color::white() },
         );
+        if needs_click_regions {
+          let p = self.path.clone();
+          let d = desktop.id;
+          ctx.add_on_click(rect, move || switch_desktop(&p, d));
+        }
         i += 1;
       }
     }

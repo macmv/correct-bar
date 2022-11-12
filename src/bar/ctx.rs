@@ -1,9 +1,10 @@
-use super::{Color, DynamicBuffer, Padding, Pos, Rect, Window};
+use super::{ClickRegion, Color, DynamicBuffer, Padding, Pos, Rect, Window};
 
 pub struct RenderContext<'a> {
-  padding: Padding,
-  window:  &'a mut Window,
-  buffer:  &'a mut DynamicBuffer,
+  padding:       Padding,
+  window:        &'a mut Window,
+  buffer:        &'a mut DynamicBuffer,
+  click_regions: &'a mut Vec<ClickRegion>,
 
   pub(super) pos: u32,
 }
@@ -13,8 +14,9 @@ impl<'a> RenderContext<'a> {
     padding: Padding,
     window: &'a mut Window,
     buffer: &'a mut DynamicBuffer,
+    click_regions: &'a mut Vec<ClickRegion>,
   ) -> Self {
-    RenderContext { padding, window, buffer, pos: padding.left }
+    RenderContext { padding, window, buffer, click_regions, pos: padding.left }
   }
 
   /// Returns the current cursor.
@@ -24,6 +26,16 @@ impl<'a> RenderContext<'a> {
 
   /// Returns the padding on this module.
   pub fn padding(&self) -> Padding { self.padding }
+
+  /// Returns `true` if the click regions need to be setup.
+  pub fn needs_click_regions(&self) -> bool { self.click_regions.is_empty() }
+
+  /// Calls the given `func` any time `region` is clicked. This should only be
+  /// called if `needs_click_regions` is true! This will not be cleared every
+  /// time `render` is called.
+  pub fn add_on_click(&mut self, region: Rect, func: impl Fn() + Send + Sync + 'static) {
+    self.click_regions.push(ClickRegion { region, func: Box::new(func) });
+  }
 
   /// Advances the cursor by the given number of pixels.
   pub fn advance_by(&mut self, pixels: u32) {

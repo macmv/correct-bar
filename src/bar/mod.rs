@@ -142,6 +142,7 @@ impl Bar {
       module.module.imp().padding_override().unwrap_or(self.config.padding),
       &mut self.window,
       &mut module.buffer,
+      &mut module.click_regions,
     );
     module.module.imp().render(&mut ctx);
 
