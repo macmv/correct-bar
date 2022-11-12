@@ -1,15 +1,20 @@
-use super::{Color, DynamicBuffer, Pos, Rect, Window};
+use super::{Color, DynamicBuffer, Padding, Pos, Rect, Window};
 
 pub struct RenderContext<'a> {
-  window: &'a mut Window,
-  buffer: &'a mut DynamicBuffer,
+  padding: Padding,
+  window:  &'a mut Window,
+  buffer:  &'a mut DynamicBuffer,
 
   pub(super) pos: u32,
 }
 
 impl<'a> RenderContext<'a> {
-  pub(super) fn new(window: &'a mut Window, buffer: &'a mut DynamicBuffer) -> Self {
-    RenderContext { window, buffer, pos: 0 }
+  pub(super) fn new(
+    padding: Padding,
+    window: &'a mut Window,
+    buffer: &'a mut DynamicBuffer,
+  ) -> Self {
+    RenderContext { padding, window, buffer, pos: padding.left }
   }
 
   /// Returns the current cursor.
@@ -20,8 +25,8 @@ impl<'a> RenderContext<'a> {
   /// Advances the cursor by the given number of pixels.
   pub fn advance_by(&mut self, pixels: u32) {
     self.pos += pixels;
-    if self.pos > self.buffer.width() {
-      self.buffer.resize(self.pos);
+    if self.pos + self.padding.right > self.buffer.width() {
+      self.buffer.resize(self.pos + self.padding.right);
     }
   }
 

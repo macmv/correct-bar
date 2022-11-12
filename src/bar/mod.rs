@@ -38,10 +38,7 @@ impl PositionedModule {
     PositionedModule { module, pos: 0, buffer: DynamicBuffer::new(height, background) }
   }
 
-  pub fn width(&self, config: &Config) -> u32 {
-    let padding = self.module.imp().padding_override().unwrap_or(config.padding);
-    self.buffer.width() + padding.left + padding.right
-  }
+  pub fn width(&self, _config: &Config) -> u32 { self.buffer.width() }
 }
 
 pub trait Backend {
@@ -90,7 +87,11 @@ impl Bar {
       ( $module:expr ) => {{
         let background = $module.module.imp().background().unwrap_or(self.config.background);
         $module.buffer.fill_and_set_background(background);
-        let mut ctx = RenderContext::new(&mut self.window, &mut $module.buffer);
+        let mut ctx = RenderContext::new(
+          $module.module.imp().padding_override().unwrap_or(self.config.padding),
+          &mut self.window,
+          &mut $module.buffer,
+        );
         $module.module.imp().render(&mut ctx);
       }};
     }
