@@ -34,8 +34,6 @@ atoms! {
   wm_del_window:       b"WM_DELETE_WINDOW",
   wm_state:            b"_NET_WM_STATE",
   wm_state_above:      b"_NET_WM_STATE_ABOVE",
-  wm_state_maxv:       b"_NET_WM_STATE_MAXIMIZED_VERT",
-  wm_state_maxh:       b"_NET_WM_STATE_MAXIMIZED_HORZ",
   wm_state_sticky:     b"_NET_WM_STATE_STICKY",
   wm_strut:            b"_NET_WM_STRUT",
   wm_strut_partial:    b"_NET_WM_STRUT_PARTIAL",
@@ -128,12 +126,11 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
 
   let setup = conn.get_setup();
   let screen = setup.roots().nth(screen_num as usize).unwrap().clone();
-  let root = screen.root();
   let depth = screen.root_depth();
 
   let window = conn.generate_id();
 
-  let cookie = conn.send_request_checked(&x::CreateWindow {
+  conn.check_request(conn.send_request_checked(&x::CreateWindow {
     depth:        x::COPY_FROM_PARENT as u8,
     wid:          window,
     parent:       screen.root(),
@@ -149,20 +146,15 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
       x::Cw::BackPixel(0x222222),
       x::Cw::EventMask(x::EventMask::EXPOSURE | x::EventMask::KEY_PRESS),
     ],
-  });
-  // We now check if the window creation worked.
-  // A cookie can't be cloned; it is moved to the function.
-  conn.check_request(cookie)?;
+  }))?;
 
-  // Let's change the window title
-  let cookie = conn.send_request_checked(&x::ChangeProperty {
+  conn.check_request(conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Replace,
     window,
     property: x::ATOM_WM_NAME,
     r#type: x::ATOM_STRING,
     data: b"Correct Bar",
-  });
-  conn.check_request(cookie)?;
+  }))?;
 
   let atoms = Atoms::setup(&conn)?;
 
@@ -244,8 +236,6 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
 
   assert_eq!(depth, 24);
 
-  let mut maximized = false;
-
   let conn = Arc::new(conn);
   let bar = Arc::new(Mutex::new(Bar::from_config(
     config,
@@ -257,48 +247,7 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
   thread::spawn(move || {
     loop {
       match conn.wait_for_event().unwrap() {
-        xcb::Event::X(x::Event::Expose(_)) => {
-          b2.lock().render();
-          println!("Got an expose!");
-        }
-        xcb::Event::X(x::Event::KeyPress(ev)) => {
-          if ev.detail() == 0x3a {
-            // The M key was pressed
-            // (M only on qwerty keyboards. Keymap support is done
-            // with the `xkb` extension and the `xkbcommon-rs` crate)
-
-            // We toggle maximized state, for this we send a message
-            // by building a `x::ClientMessageEvent` with the proper
-            // atoms and send it to the server.
-
-            let data = x::ClientMessageData::Data32([
-              if maximized { 0 } else { 1 },
-              atoms.wm_state_maxv.resource_id(),
-              atoms.wm_state_maxh.resource_id(),
-              0,
-              0,
-            ]);
-            let event = x::ClientMessageEvent::new(window, atoms.wm_state, data);
-            let cookie = conn.send_request_checked(&x::SendEvent {
-              propagate:   false,
-              destination: x::SendEventDest::Window(root),
-              event_mask:  x::EventMask::STRUCTURE_NOTIFY,
-              event:       &event,
-            });
-            conn.check_request(cookie).unwrap();
-
-            // Same as before, if we don't check for error, we have to flush
-            // the connection.
-            // conn.flush()?;
-
-            maximized = !maximized;
-          } else if ev.detail() == 0x18 {
-            // Q (on qwerty)
-
-            // We exit the event loop (and the program)
-            break;
-          }
-        }
+        xcb::Event::X(x::Event::Expose(_)) => b2.lock().render(),
         xcb::Event::X(x::Event::ClientMessage(ev)) => {
           // We have received a message from the server
           if let x::ClientMessageData::Data32([atom, ..]) = ev.data() {
