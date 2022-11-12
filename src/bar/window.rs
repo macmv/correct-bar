@@ -243,16 +243,16 @@ impl Buffer {
     // if i + 4 <= buf.len() {
     if pos.x < self.width && pos.y < self.height {
       let i = (pos.y * self.width + pos.x) as usize * 4;
-      self.data[i] = color.r;
+      self.data[i] = color.b;
       self.data[i + 1] = color.g;
-      self.data[i + 2] = color.b;
+      self.data[i + 2] = color.r;
     }
   }
 
   pub fn get_pixel(&self, pos: Pos) -> Color {
     if pos.x < self.width && pos.y < self.height {
       let i = (pos.y * self.width + pos.x) as usize * 4;
-      Color { r: self.data[i], g: self.data[i + 1], b: self.data[i + 2] }
+      Color { b: self.data[i], g: self.data[i + 1], r: self.data[i + 2] }
     } else {
       Color::black()
     }

@@ -10,7 +10,7 @@ impl Color {
   pub const fn white() -> Self { Color { r: 255, g: 255, b: 255 } }
   pub const fn gray(v: u8) -> Self { Color { r: v, g: v, b: v } }
   pub const fn from_hex(hex: u32) -> Self {
-    Color { r: hex as u8, g: (hex >> 8) as u8, b: (hex >> 16) as u8 }
+    Color { r: (hex >> 16) as u8, g: (hex >> 8) as u8, b: hex as u8 }
   }
 
   /// Returns this color faded with the background. An alpha of `255` will
@@ -35,6 +35,11 @@ impl Color {
 #[cfg(test)]
 mod tests {
   use super::*;
+
+  #[test]
+  fn from_hex() {
+    assert_eq!(Color::from_hex(0xff8800), Color { r: 0xff, g: 0x88, b: 0x00 });
+  }
 
   #[test]
   fn fade() {

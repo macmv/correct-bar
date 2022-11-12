@@ -33,7 +33,7 @@ pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
       Module::text("foo and stuff", Color { r: 100, g: 255, b: 128 }).into(),
     ],
     vec![
-      Module::text("mmm things", Color { r: 255, g: 100, b: 128 }).into(),
+      Module::text("mmm things", Color::from_hex(0x8866ff)).into(),
       SepModule.into(),
       modules::Cpu::new().into(),
       SepModule.into(),
