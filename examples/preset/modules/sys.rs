@@ -1,34 +1,139 @@
 use correct_bar::bar::{Color, ModuleImpl, Updater};
 use std::{
   cell::RefCell,
+  collections::HashMap,
+  fs::File,
+  io::{BufRead, Seek, SeekFrom},
   time::{Duration, Instant},
 };
-use sysinfo::{ComponentExt, CpuExt, SystemExt};
 
 thread_local! {
-  static SYS: RefCell<SystemInfo> = RefCell::new(SystemInfo {
-    last_update: None,
-    info:        sysinfo::System::new_all()
-  });
+  static SYS: RefCell<Option<SystemInfo>> = RefCell::new(None);
 }
 
 struct SystemInfo {
-  last_update: Option<Instant>,
-  info:        sysinfo::System,
+  last_update: Instant,
+  last_state:  Option<ProcState>,
+  curr_state:  ProcState,
+
+  files: Files,
 }
 
-impl SystemInfo {
-  fn refresh(&mut self) {
-    if let Some(last_update) = self.last_update {
-      if last_update.elapsed() > Duration::from_secs(1) {
-        self.update();
-      }
-    } else {
-      self.update();
+#[derive(Clone, Debug)]
+struct ProcState {
+  meminfo: Meminfo,
+  stat:    Stat,
+}
+struct Files {
+  stat:    File,
+  meminfo: File,
+}
+
+/// The contents of `/proc/meminfo`
+#[derive(Clone, Debug)]
+struct Meminfo {
+  mem_total_kb: u32,
+  mem_free_kb:  u32,
+  mem_avail_kb: u32,
+}
+/// The contents of `/proc/stat`
+#[derive(Clone, Debug)]
+struct Stat {
+  average: CpuStat,
+  cpus:    Vec<CpuStat>,
+}
+#[derive(Clone, Debug)]
+struct CpuStat {
+  user:    u32,
+  nice:    u32,
+  system:  u32,
+  idle:    u32,
+  iowait:  u32,
+  irq:     u32,
+  softirq: u32,
+}
+
+/// The state of the system. This stores a delta between the state some time
+/// ago, and the current state.
+#[derive(Clone, Debug)]
+pub struct State {
+  pub memory: MemoryState,
+  pub cpu:    CpuState,
+}
+
+#[derive(Clone, Debug)]
+pub struct MemoryState {
+  pub total_mbs: u32,
+  pub used_mbs:  u32,
+  pub free_mbs:  u32,
+}
+
+#[derive(Clone, Debug)]
+pub struct CpuState {
+  pub usage: f64,
+}
+
+impl Files {
+  pub fn new() -> Self {
+    Files {
+      meminfo: File::open("/proc/meminfo").unwrap(),
+      stat:    File::open("/proc/stat").unwrap(),
     }
   }
 
-  fn update(&mut self) { self.info.refresh_all(); }
+  pub fn read_state(&mut self) -> ProcState {
+    ProcState {
+      meminfo: Meminfo::read_from(&mut self.meminfo),
+      stat:    Stat::read_from(&mut self.stat),
+    }
+  }
+}
+
+impl Meminfo {
+  fn read_from(file: &mut File) -> Self {
+    file.seek(SeekFrom::Start(0));
+    let mut reader = std::io::BufReader::new(file);
+    let values = reader
+      .lines()
+      .flat_map(|line| {
+        let mut sections = line.unwrap().split(":");
+        let key = sections.next().unwrap();
+        let value = sections.next().unwrap().trim();
+        value.strip_suffix(" kB").map(|val| (key.to_string(), val.parse::<u32>().unwrap()))
+      })
+      .collect::<HashMap<String, u32>>();
+    Meminfo {
+      mem_total_kb: values["MemTotal"],
+      mem_free_kb:  values["MemFree"],
+      mem_avail_kb: values["MemAvail"],
+    }
+  }
+}
+impl Stat {
+  fn read_from(file: &mut File) -> Self {}
+}
+
+impl SystemInfo {
+  pub fn new() -> SystemInfo {
+    let files = Files::new();
+    let curr_state = files.read_state();
+    SystemInfo { last_update: Instant::now(), last_state: None, curr_state, files }
+  }
+
+  fn refresh(&mut self) {
+    let now = Instant::now();
+    if now.duration_since(self.last_update) > Duration::from_secs(1) {
+      self.update();
+      self.last_update = now;
+    }
+  }
+
+  fn update(&mut self) {
+    let new_state = self.files.read_state();
+    self.last_state = Some(std::mem::replace(&mut self.curr_state, new_state));
+  }
+
+  pub fn state(&self) -> State {}
 }
 
 pub struct Temp {
@@ -40,15 +145,26 @@ impl ModuleImpl for Temp {
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     SYS.with(|s| {
       let mut sys = s.borrow_mut();
+      if sys.is_none() {
+        *sys = Some(SystemInfo::new());
+      }
+      let mut sys = sys.unwrap();
       sys.refresh();
+      let state = sys.state();
 
-      for c in sys.info.components() {
+      let temp = 50.0;
+      ctx.draw_text(&format!("{:>2.00}", temp), self.primary);
+      ctx.draw_text("°", self.secondary);
+
+      /*
+      for c in state.components {
         if c.label() == "k10temp Tccd1" {
           ctx.draw_text(&format!("{:>2.00}", c.temperature()), self.primary);
           ctx.draw_text("°", self.secondary);
           break;
         }
       }
+      */
     });
   }
 }
@@ -62,12 +178,17 @@ impl ModuleImpl for Cpu {
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     SYS.with(|s| {
       let mut sys = s.borrow_mut();
+      if sys.is_none() {
+        *sys = Some(SystemInfo::new());
+      }
+      let mut sys = sys.unwrap();
       sys.refresh();
+      let state = sys.state();
 
       ctx.draw_text(
         &format!(
           "{:>2.00}",
-          sys.info.cpus().iter().map(|c| c.cpu_usage()).sum::<f32>() / sys.info.cpus().len() as f32,
+          state.cpus.iter().map(|c| c.cpu_usage()).sum::<f32>() / state.cpus.len() as f32,
         ),
         self.primary,
       );
@@ -85,14 +206,20 @@ impl ModuleImpl for Mem {
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     SYS.with(|s| {
       let mut sys = s.borrow_mut();
+      if sys.is_none() {
+        *sys = Some(SystemInfo::new());
+      }
+      let mut sys = sys.unwrap();
       sys.refresh();
+      let state = sys.state();
+
       ctx.draw_text(
-        &format!("{:>5.02}G", sys.info.used_memory() as f64 / (1024 * 1024 * 1024) as f64),
+        &format!("{:>5.02}G", state.used_memory as f64 / (1024 * 1024 * 1024) as f64),
         self.primary,
       );
       ctx.draw_text(" / ", self.secondary);
       ctx.draw_text(
-        &format!("{:>5.02}G", sys.info.total_memory() as f64 / (1024 * 1024 * 1024) as f64),
+        &format!("{:>5.02}G", state.total_memory as f64 / (1024 * 1024 * 1024) as f64),
         self.primary,
       );
     });
