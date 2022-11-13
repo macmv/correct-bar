@@ -30,7 +30,6 @@ macro_rules! atoms {
 }
 
 atoms! {
-  wm_protocols:        b"WM_PROTOCOLS",
   wm_del_window:       b"WM_DELETE_WINDOW",
   wm_state:            b"_NET_WM_STATE",
   wm_state_above:      b"_NET_WM_STATE_ABOVE",
@@ -121,6 +120,28 @@ pub fn setup(config: Config) -> Arc<Mutex<Bar>> {
   }
 }
 
+fn root_windows(conn: &xcb::Connection, screen: &xcb::x::Screen) -> xcb::Result<Vec<x::Window>> {
+  let tree = conn.wait_for_reply(conn.send_request(&x::QueryTree { window: screen.root() }))?;
+
+  let mut roots = vec![];
+  for child in tree.children() {
+    let atom = conn.wait_for_reply(conn.send_request(&x::GetProperty {
+      delete:      false,
+      window:      *child,
+      property:    x::ATOM_WM_CLASS,
+      r#type:      x::ATOM_STRING,
+      long_offset: 0,
+      long_length: 4,
+    }))?;
+    let classes = std::str::from_utf8(atom.value()).unwrap();
+    if classes.split("\0").any(|class| class == "Bspwm") {
+      roots.push(*child);
+    }
+  }
+
+  Ok(roots)
+}
+
 fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
   let (conn, screen_num) = xcb::Connection::connect(None)?;
 
@@ -148,6 +169,30 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
     ],
   }))?;
 
+  dbg!(screen.root_visual());
+
+  let atoms = Atoms::setup(&conn)?;
+
+  // We just need a single root. It doesn't actually matter which one we choose.
+  let root = root_windows(&conn, screen)?[0];
+
+  // If we needed to figure out which root this was, we can get geometry with
+  // this, but it doesn't matter which root we have.
+  /*
+  let geom = conn
+    .wait_for_reply(conn.send_request(&x::GetGeometry { drawable: x::Drawable::Window(root) }))?;
+  */
+
+  conn
+    .check_request(conn.send_request_checked(&x::ConfigureWindow {
+      window,
+      value_list: &[
+        x::ConfigWindow::Sibling(root),
+        x::ConfigWindow::StackMode(x::StackMode::Above),
+      ],
+    }))
+    .unwrap();
+
   conn.check_request(conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Replace,
     window,
@@ -155,8 +200,6 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
     r#type: x::ATOM_STRING,
     data: b"Correct Bar",
   }))?;
-
-  let atoms = Atoms::setup(&conn)?;
 
   // Need to send these requests before mapping the window!
 
@@ -202,17 +245,6 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
   conn.check_request(cookie)?;
 
   conn.send_request(&x::MapWindow { window });
-
-  // We now activate the window close event by sending the following request.
-  // If we don't do this we can still close the window by clicking on the "x"
-  // button, but the event loop is notified through a connection shutdown error.
-  conn.check_request(conn.send_request_checked(&x::ChangeProperty {
-    mode: x::PropMode::Replace,
-    window,
-    property: atoms.wm_protocols,
-    r#type: x::ATOM_ATOM,
-    data: &[atoms.wm_del_window],
-  }))?;
 
   // Previous request was checked, so a flush is not necessary in this case.
   // Otherwise, here is how to perform a connection flush.
