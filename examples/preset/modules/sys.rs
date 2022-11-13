@@ -34,6 +34,7 @@ struct Files {
 
 /// The contents of `/proc/meminfo`
 #[derive(Clone, Debug)]
+#[allow(unused)]
 struct Meminfo {
   mem_total_kb: u64,
   mem_free_kb:  u64,
@@ -46,6 +47,7 @@ struct Stat {
   cpus:    Vec<CpuStat>,
 }
 #[derive(Clone, Debug)]
+#[allow(unused)]
 struct CpuStat {
   user:       u32,
   nice:       u32,
@@ -165,7 +167,7 @@ impl CpuStat {
   }
 
   // Returns the total cpu time. This excludes the `idle` time.
-  fn total(&self) -> u32 { self.user + self.nice + self.system }
+  fn total(&self) -> u32 { self.user + self.nice + self.system + self.irq + self.softirq }
 }
 
 impl SystemInfo {
