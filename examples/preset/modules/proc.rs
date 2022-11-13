@@ -1,3 +1,5 @@
+//! Reads from /proc to get the current memory and cpu usage.
+
 use correct_bar::bar::{Color, ModuleImpl, Updater};
 use std::{
   cell::RefCell,

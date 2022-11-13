@@ -1,9 +1,9 @@
 mod bspwm;
 mod clock;
 mod hwmon;
-mod sys;
+mod proc;
 
 pub use bspwm::BSPWM;
 pub use clock::Clock;
 pub use hwmon::Temp;
-pub use sys::{Cpu, Mem};
+pub use proc::{Cpu, Mem};
