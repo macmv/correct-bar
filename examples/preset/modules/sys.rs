@@ -44,13 +44,16 @@ struct Stat {
 }
 #[derive(Clone, Debug)]
 struct CpuStat {
-  user:    u32,
-  nice:    u32,
-  system:  u32,
-  idle:    u32,
-  iowait:  u32,
-  irq:     u32,
-  softirq: u32,
+  user:       u32,
+  nice:       u32,
+  system:     u32,
+  idle:       u32,
+  iowait:     u32,
+  irq:        u32,
+  softirq:    u32,
+  steal:      u32,
+  guest:      u32,
+  guest_nice: u32,
 }
 
 /// The state of the system. This stores a delta between the state some time
@@ -110,7 +113,43 @@ impl Meminfo {
   }
 }
 impl Stat {
-  fn read_from(file: &mut File) -> Self {}
+  fn read_from(file: &mut File) -> Self {
+    file.seek(SeekFrom::Start(0));
+    let mut reader = std::io::BufReader::new(file);
+    let mut lines = reader.lines();
+
+    let first_line = lines.next().unwrap();
+    let average = CpuStat::parse(first_line);
+
+    let mut cpus = vec![];
+    for line in lines {
+      if line.starts_with("cpu") {
+        cpus.push(CpuStat::parse(line));
+      } else {
+        break;
+      }
+    }
+  }
+}
+
+impl CpuStat {
+  fn parse_from(s: &str) -> Self {
+    let mut sections = s.split(" ");
+    let _ = sections.next().unwrap(); // this is the cpu/cpu0/cpu1 section
+
+    CpuStat {
+      user:       sections.next().unwrap().parse::<u32>().unwrap(),
+      nice:       sections.next().unwrap().parse::<u32>().unwrap(),
+      system:     sections.next().unwrap().parse::<u32>().unwrap(),
+      idle:       sections.next().unwrap().parse::<u32>().unwrap(),
+      iowait:     sections.next().unwrap().parse::<u32>().unwrap(),
+      irq:        sections.next().unwrap().parse::<u32>().unwrap(),
+      softirq:    sections.next().unwrap().parse::<u32>().unwrap(),
+      steal:      sections.next().unwrap().parse::<u32>().unwrap(),
+      guest:      sections.next().unwrap().parse::<u32>().unwrap(),
+      guest_nice: sections.next().unwrap().parse::<u32>().unwrap(),
+    }
+  }
 }
 
 impl SystemInfo {
