@@ -41,7 +41,7 @@ pub fn modules() -> (Vec<Module>, Vec<Module>, Vec<Module>) {
       SepModule.into(),
       modules::Mem { primary: Color::from_hex(0xffcc00), secondary: SEP }.into(),
       SepModule.into(),
-      modules::Time { primary: Color::white(), secondary: SEP }.into(),
+      modules::Clock { primary: Color::white(), secondary: SEP }.into(),
     ],
   )
 }
