@@ -216,39 +216,6 @@ impl SystemInfo {
   }
 }
 
-pub struct Temp {
-  pub primary:   Color,
-  pub secondary: Color,
-}
-impl ModuleImpl for Temp {
-  fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
-  fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
-    SYS.with(|s| {
-      let mut sys = s.borrow_mut();
-      if sys.is_none() {
-        *sys = Some(SystemInfo::new());
-      }
-      let sys = sys.as_mut().unwrap();
-      sys.refresh();
-      let state = sys.state();
-
-      let temp = 50.0;
-      ctx.draw_text(&format!("{:>2.00}", temp), self.primary);
-      ctx.draw_text("°", self.secondary);
-
-      /*
-      for c in state.components {
-        if c.label() == "k10temp Tccd1" {
-          ctx.draw_text(&format!("{:>2.00}", c.temperature()), self.primary);
-          ctx.draw_text("°", self.secondary);
-          break;
-        }
-      }
-      */
-    });
-  }
-}
-
 pub struct Cpu {
   pub primary:   Color,
   pub secondary: Color,
