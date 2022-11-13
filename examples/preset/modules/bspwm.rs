@@ -233,6 +233,7 @@ mod json {
   pub enum WindowState {
     Tiled,
     Floating,
+    Fullscreen,
   }
 
   #[derive(Clone, Debug, Deserialize)]
