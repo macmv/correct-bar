@@ -174,24 +174,25 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
   let atoms = Atoms::setup(&conn)?;
 
   // We just need a single root. It doesn't actually matter which one we choose.
-  let root = root_windows(&conn, screen)?[0];
+  // This is for BSPWM, to avoid the window showing up in fullscreen.
+  if let Some(root) = root_windows(&conn, screen)?.get(0) {
+    // If we needed to figure out which root this was, we can get geometry with
+    // this, but it doesn't matter which root we have.
+    /*
+    let geom = conn
+      .wait_for_reply(conn.send_request(&x::GetGeometry { drawable: x::Drawable::Window(root) }))?;
+    */
 
-  // If we needed to figure out which root this was, we can get geometry with
-  // this, but it doesn't matter which root we have.
-  /*
-  let geom = conn
-    .wait_for_reply(conn.send_request(&x::GetGeometry { drawable: x::Drawable::Window(root) }))?;
-  */
-
-  conn
-    .check_request(conn.send_request_checked(&x::ConfigureWindow {
-      window,
-      value_list: &[
-        x::ConfigWindow::Sibling(root),
-        x::ConfigWindow::StackMode(x::StackMode::Above),
-      ],
-    }))
-    .unwrap();
+    conn
+      .check_request(conn.send_request_checked(&x::ConfigureWindow {
+        window,
+        value_list: &[
+          x::ConfigWindow::Sibling(*root),
+          x::ConfigWindow::StackMode(x::StackMode::Above),
+        ],
+      }))
+      .unwrap();
+  }
 
   conn.check_request(conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Replace,

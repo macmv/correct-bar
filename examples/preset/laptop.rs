@@ -4,7 +4,7 @@ use correct_bar::{
 };
 
 pub fn run() {
-  let (modules_left, modules_middle, modules_right) = super::modules();
+  let (modules_left, modules_middle, modules_right) = super::modules(false);
   let config = Config {
     window: WindowConfig {
       margin_top: 40,
