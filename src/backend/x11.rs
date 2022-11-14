@@ -169,8 +169,6 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
     ],
   }))?;
 
-  dbg!(screen.root_visual());
-
   let atoms = Atoms::setup(&conn)?;
 
   // We just need a single root. It doesn't actually matter which one we choose.
