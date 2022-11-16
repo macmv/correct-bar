@@ -73,7 +73,7 @@ impl<'a> RenderContext<'a> {
   /// to add a space which is the width of some text.
   pub fn advance_text(&mut self, text: &str) -> Rect {
     let size = self.effective_font_size();
-    let pos = Pos { x: self.pos, y: self.window.height() - 5 };
+    let pos = Pos { x: self.pos, y: self.window.height() - self.height() / 5 };
     let rect = self.buffer.layout_text(self.window.font_mut(), pos, text, size);
     self.advance_by(rect.width);
     rect.with_y(0).with_height(self.window.height())
@@ -83,7 +83,7 @@ impl<'a> RenderContext<'a> {
   /// Returns the rectangle of the drawn text.
   pub fn draw_text(&mut self, text: &str, color: Color) -> Rect {
     let size = self.effective_font_size();
-    let pos = Pos { x: self.pos, y: self.window.height() - 5 };
+    let pos = Pos { x: self.pos, y: self.window.height() - self.height() / 5 };
     let rect = self.buffer.draw_text(self.window.font_mut(), pos, text, size, color);
     self.advance_by(rect.width);
     rect.with_y(0).with_height(self.window.height())
