@@ -171,25 +171,31 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
 
   let atoms = Atoms::setup(&conn)?;
 
-  // We just need a single root. It doesn't actually matter which one we choose.
-  // This is for BSPWM, to avoid the window showing up in fullscreen.
-  if let Some(root) = root_windows(&conn, screen)?.get(0) {
-    // If we needed to figure out which root this was, we can get geometry with
-    // this, but it doesn't matter which root we have.
-    /*
+  // We just need a single root. The one we choose needs to be correct, in order
+  // for cliking on the bar to work. This is for BSPWM, to avoid the window
+  // showing up in fullscreen.
+  for root in root_windows(&conn, screen)? {
     let geom = conn
       .wait_for_reply(conn.send_request(&x::GetGeometry { drawable: x::Drawable::Window(root) }))?;
-    */
 
-    conn
-      .check_request(conn.send_request_checked(&x::ConfigureWindow {
-        window,
-        value_list: &[
-          x::ConfigWindow::Sibling(*root),
-          x::ConfigWindow::StackMode(x::StackMode::Above),
-        ],
-      }))
-      .unwrap();
+    if geom.x() == 0
+      && geom.y() == 0
+      && geom.width()
+        == config.window.width as u16
+          + config.window.margin_left as u16
+          + config.window.margin_right as u16
+    {
+      conn
+        .check_request(conn.send_request_checked(&x::ConfigureWindow {
+          window,
+          value_list: &[
+            x::ConfigWindow::Sibling(root),
+            x::ConfigWindow::StackMode(x::StackMode::Above),
+          ],
+        }))
+        .unwrap();
+      break;
+    }
   }
 
   conn.check_request(conn.send_request_checked(&x::ChangeProperty {
