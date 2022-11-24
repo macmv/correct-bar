@@ -7,6 +7,7 @@ use correct_bar::{
   math::Rect,
 };
 
+#[derive(Clone)]
 struct SepModule;
 
 impl ModuleImpl for SepModule {
@@ -16,6 +17,7 @@ impl ModuleImpl for SepModule {
     ctx.draw_rect(Rect { pos: ctx.pos(), width: 2, height: ctx.height() }, SEP);
     ctx.advance_by(2);
   }
+  fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }
 }
 
 const SEP: Color = Color::from_hex(0x222222);

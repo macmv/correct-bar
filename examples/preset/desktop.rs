@@ -7,13 +7,12 @@ pub fn run() {
   let (modules_left, modules_middle, modules_right) = super::modules(true);
   let config = Config {
     window: WindowConfig {
-      margin_top: 0,
-      margin_left: 0,
-      margin_right: 0,
-      margin_bottom: 0,
-      width: 3840,
-      height: 50,
-      ..Default::default()
+      height:         25,
+      expected_width: 1920,
+      margin_top:     0,
+      margin_left:    0,
+      margin_right:   0,
+      margin_bottom:  0,
     },
     modules_left,
     modules_middle,

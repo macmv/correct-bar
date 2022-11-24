@@ -3,7 +3,7 @@ use crate::{
   config::Config,
 };
 use parking_lot::Mutex;
-use std::{sync::Arc, thread};
+use std::{collections::HashMap, sync::Arc, thread};
 use xcb::{x, Xid};
 
 macro_rules! atoms {
@@ -110,7 +110,7 @@ impl Backend for X11Backend {
   }
 }
 
-pub fn setup(config: Config) -> Arc<Mutex<Bar>> {
+pub fn setup(config: Config) -> Vec<Arc<Mutex<Bar>>> {
   match setup_inner(config) {
     Ok(bar) => bar,
     Err(e) => {
@@ -142,22 +142,26 @@ fn root_windows(conn: &xcb::Connection, screen: &xcb::x::Screen) -> xcb::Result<
   Ok(roots)
 }
 
-fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
-  let (conn, screen_num) = xcb::Connection::connect(None)?;
-
-  let setup = conn.get_setup();
-  let screen = setup.roots().nth(screen_num as usize).unwrap().clone();
-  let depth = screen.root_depth();
-
+fn setup_window(
+  atoms: &Atoms,
+  conn: &Arc<xcb::Connection>,
+  config: Config,
+  screen: &x::Screen,
+  root_window: x::Window,
+  x: i16,
+  y: i16,
+  width: u16,
+) -> xcb::Result<(x::Window, Bar)> {
   let window = conn.generate_id();
+  let depth = screen.root_depth();
 
   conn.check_request(conn.send_request_checked(&x::CreateWindow {
     depth:        x::COPY_FROM_PARENT as u8,
     wid:          window,
     parent:       screen.root(),
-    x:            config.window.margin_left as i16,
-    y:            config.window.margin_top as i16,
-    width:        config.window.width as u16,
+    x:            x + config.window.margin_left as i16,
+    y:            x + config.window.margin_top as i16,
+    width:        width as u16,
     height:       config.window.height as u16,
     border_width: 0,
     class:        x::WindowClass::InputOutput,
@@ -169,34 +173,13 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
     ],
   }))?;
 
-  let atoms = Atoms::setup(&conn)?;
-
-  // We just need a single root. The one we choose needs to be correct, in order
-  // for cliking on the bar to work. This is for BSPWM, to avoid the window
-  // showing up in fullscreen.
-  for root in root_windows(&conn, screen)? {
-    let geom = conn
-      .wait_for_reply(conn.send_request(&x::GetGeometry { drawable: x::Drawable::Window(root) }))?;
-
-    if geom.x() == 0
-      && geom.y() == 0
-      && geom.width()
-        == config.window.width as u16
-          + config.window.margin_left as u16
-          + config.window.margin_right as u16
-    {
-      conn
-        .check_request(conn.send_request_checked(&x::ConfigureWindow {
-          window,
-          value_list: &[
-            x::ConfigWindow::Sibling(root),
-            x::ConfigWindow::StackMode(x::StackMode::Above),
-          ],
-        }))
-        .unwrap();
-      break;
-    }
-  }
+  conn.check_request(conn.send_request_checked(&x::ConfigureWindow {
+    window,
+    value_list: &[
+      x::ConfigWindow::Sibling(root_window),
+      x::ConfigWindow::StackMode(x::StackMode::Above),
+    ],
+  }))?;
 
   conn.check_request(conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Replace,
@@ -229,7 +212,7 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
   strut[Strut::Top as usize] =
     config.window.margin_top + config.window.height + config.window.margin_bottom;
   strut[Strut::TopStartX as usize] = config.window.margin_left;
-  strut[Strut::TopEndX as usize] = config.window.width - config.window.margin_right;
+  strut[Strut::TopEndX as usize] = width as u32 - config.window.margin_right;
 
   let cookie = conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Replace,
@@ -260,7 +243,7 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
     drawable: x::Drawable::Window(window),
     pid: pixmap,
     height: config.window.height as u16,
-    width: config.window.width as u16,
+    width: width as u16,
     depth,
   }))?;
 
@@ -273,20 +256,59 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
 
   assert_eq!(depth, 24);
 
+  let height = config.window.height;
+  Ok((
+    window,
+    Bar::from_config(
+      config,
+      width.into(),
+      height,
+      X11Backend { conn: conn.clone(), window, pixmap, depth, gc },
+    ),
+  ))
+}
+
+fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
+  let (conn, screen_num) = xcb::Connection::connect(None)?;
+
   let conn = Arc::new(conn);
-  let bar = Arc::new(Mutex::new(Bar::from_config(
-    config,
-    X11Backend { conn: conn.clone(), window, pixmap, depth, gc },
-  )));
+
+  let setup = conn.get_setup();
+  let screen = setup.roots().nth(screen_num as usize).unwrap().clone();
+
+  let atoms = Atoms::setup(&conn)?;
+
+  // We setup a bar for every root. Sometimes we get a fake geom here, which isn't
+  // really a monitor, so we make sure it's real by checking that it's X/Y > 0.
+  let mut bars = vec![];
+  let mut bars_map = HashMap::new();
+  for root in root_windows(&conn, screen)? {
+    let geom = conn
+      .wait_for_reply(conn.send_request(&x::GetGeometry { drawable: x::Drawable::Window(root) }))?;
+
+    if geom.x() < 0 || geom.y() < 0 {
+      continue;
+    }
+
+    let (window, bar) =
+      setup_window(&atoms, &conn, config.clone(), screen, root, geom.x(), geom.y(), geom.width())?;
+    let bar = Arc::new(Mutex::new(bar));
+
+    bars_map.insert(window.resource_id(), bar.clone());
+    bars.push(bar);
+  }
 
   // We enter the main event loop
-  let b2 = bar.clone();
   thread::spawn(move || {
     loop {
       match conn.wait_for_event().unwrap() {
-        xcb::Event::X(x::Event::Expose(_)) => b2.lock().render(),
+        xcb::Event::X(x::Event::Expose(ev)) => {
+          let bar = &bars_map[&ev.window().resource_id()];
+          bar.lock().render()
+        }
         xcb::Event::X(x::Event::ButtonPress(ev)) => {
-          b2.lock().click(ev.event_x().try_into().unwrap(), ev.event_y().try_into().unwrap())
+          let bar = &bars_map[&ev.child().resource_id()];
+          bar.lock().click(ev.event_x().try_into().unwrap(), ev.event_y().try_into().unwrap())
         }
         xcb::Event::X(x::Event::ClientMessage(ev)) => {
           // We have received a message from the server
@@ -300,5 +322,5 @@ fn setup_inner(config: Config) -> xcb::Result<Arc<Mutex<Bar>>> {
       }
     }
   });
-  Ok(bar)
+  Ok(bars)
 }

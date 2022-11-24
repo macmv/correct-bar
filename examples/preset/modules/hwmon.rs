@@ -2,12 +2,14 @@
 //! devices.
 
 use correct_bar::bar::{Color, ModuleImpl, Updater};
+use parking_lot::Mutex;
 use std::{
   cell::RefCell,
   fs,
   fs::File,
   io::{Read, Seek, SeekFrom},
   path::Path,
+  sync::Arc,
   time::Duration,
 };
 
@@ -16,7 +18,7 @@ struct Monitor {
   // The value of the `name` file.
   name: String,
 
-  temps: Vec<(String, File)>,
+  temps: Arc<Mutex<Vec<(String, File)>>>,
 }
 
 impl Monitor {
@@ -41,7 +43,12 @@ impl Monitor {
       }
     }
     temps.sort_unstable_by(|(a, _, _), (b, _, _)| a.cmp(b));
-    Monitor { name, temps: temps.into_iter().map(|(_, label, file)| (label, file)).collect() }
+    Monitor {
+      name,
+      temps: Arc::new(Mutex::new(
+        temps.into_iter().map(|(_, label, file)| (label, file)).collect(),
+      )),
+    }
   }
 
   pub fn find_all() -> Vec<Monitor> {
@@ -54,6 +61,7 @@ impl Monitor {
   pub fn read(&mut self) -> Vec<(String, f32)> {
     self
       .temps
+      .lock()
       .iter_mut()
       .map(|(name, file)| {
         file.seek(SeekFrom::Start(0)).unwrap();
@@ -73,6 +81,7 @@ thread_local! {
   static MONITORS: RefCell<Option<Vec<Monitor>>> = RefCell::new(None);
 }
 
+#[derive(Clone)]
 pub struct Temp {
   pub primary:   Color,
   pub secondary: Color,
@@ -104,4 +113,5 @@ impl ModuleImpl for Temp {
       */
     });
   }
+  fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }
 }

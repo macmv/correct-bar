@@ -218,6 +218,7 @@ impl SystemInfo {
   }
 }
 
+#[derive(Clone)]
 pub struct Cpu {
   pub primary:   Color,
   pub secondary: Color,
@@ -238,8 +239,10 @@ impl ModuleImpl for Cpu {
       ctx.draw_text("%", self.secondary);
     });
   }
+  fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }
 }
 
+#[derive(Clone)]
 pub struct Mem {
   pub primary:   Color,
   pub secondary: Color,
@@ -262,4 +265,5 @@ impl ModuleImpl for Mem {
         .draw_text(&format!("{:>5.02}G", state.memory.total_mb as f64 / 1024 as f64), self.primary);
     });
   }
+  fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }
 }

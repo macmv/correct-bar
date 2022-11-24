@@ -1,6 +1,6 @@
 use crate::bar::{Color, Module, Padding};
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Config {
   pub window:     WindowConfig,
   pub background: Color,
@@ -14,10 +14,14 @@ pub struct Config {
   pub modules_right:  Vec<Module>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct WindowConfig {
-  pub width:  u32,
-  pub height: u32,
+  pub height:         u32,
+  /// All settings should be set assuming the window monitor will be this wide.
+  /// Then, the bar will scale all settings relative to how large the monitor
+  /// actually is. So, setting this to `1920` would make all scaling settings
+  /// doubled on a `3840` pixel wide display.
+  pub expected_width: u32,
 
   pub margin_top:    u32,
   pub margin_left:   u32,

@@ -86,10 +86,20 @@ pub enum ModuleKey {
 }
 
 impl Bar {
-  pub fn from_config(mut config: Config, backend: impl Backend + Send + Sync + 'static) -> Self {
-    let mut window = Window::new(config.window.width, config.window.height);
+  pub fn from_config(
+    mut config: Config,
+    width: u32,
+    height: u32,
+    backend: impl Backend + Send + Sync + 'static,
+  ) -> Self {
+    let mut window = Window::new(width, height);
     window.buffer_mut().fill(config.background);
-    Bar { window, backend: Box::new(backend), modules: Modules::from_config(&mut config), config }
+    Bar {
+      window,
+      backend: Box::new(backend),
+      modules: Modules::from_config(&mut config, height),
+      config,
+    }
   }
 
   pub fn window(&self) -> &Window { &self.window }
@@ -188,22 +198,22 @@ impl Bar {
 
 impl Modules {
   /// Drains the modules from the given config.
-  pub fn from_config(config: &mut crate::Config) -> Self {
+  pub fn from_config(config: &mut crate::Config, height: u32) -> Self {
     Modules {
       left:   config
         .modules_left
         .drain(..)
-        .map(|m| PositionedModule::new(m, config.window.height, config.background))
+        .map(|m| PositionedModule::new(m, height, config.background))
         .collect(),
       middle: config
         .modules_middle
         .drain(..)
-        .map(|m| PositionedModule::new(m, config.window.height, config.background))
+        .map(|m| PositionedModule::new(m, height, config.background))
         .collect(),
       right:  config
         .modules_right
         .drain(..)
-        .map(|m| PositionedModule::new(m, config.window.height, config.background))
+        .map(|m| PositionedModule::new(m, height, config.background))
         .collect(),
     }
   }

@@ -115,6 +115,7 @@ impl ModuleImpl for BSPWM {
       }
     }
   }
+  fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }
 }
 
 #[allow(unused)]

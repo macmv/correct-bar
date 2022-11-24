@@ -2,6 +2,7 @@ use chrono::{Datelike, Timelike};
 use correct_bar::bar::{Color, ModuleImpl, Updater};
 use std::time::Duration;
 
+#[derive(Clone)]
 pub struct Clock {
   pub primary:   Color,
   pub secondary: Color,
@@ -61,4 +62,5 @@ impl ModuleImpl for Clock {
       });
     }
   }
+  fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }
 }

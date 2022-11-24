@@ -6,6 +6,10 @@ pub struct Module {
   imp: Box<dyn ModuleImpl + Send + Sync>,
 }
 
+impl Clone for Module {
+  fn clone(&self) -> Self { Module { imp: self.imp.box_clone() } }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Padding {
   pub left:   u32,
@@ -17,6 +21,7 @@ impl Padding {
   pub fn none() -> Self { Padding::default() }
 }
 
+#[derive(Clone)]
 pub struct TextModule {
   text:       &'static str,
   background: Option<Color>,
@@ -26,6 +31,7 @@ impl ModuleImpl for TextModule {
   fn background(&self) -> Option<Color> { self.background }
   fn render(&self, ctx: &mut RenderContext) { ctx.draw_text(self.text, self.color); }
   fn updater(&self) -> Updater { Updater::Never }
+  fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }
 }
 
 impl TextModule {
@@ -66,4 +72,5 @@ pub trait ModuleImpl {
   fn background(&self) -> Option<Color> { None }
   fn render(&self, ctx: &mut RenderContext);
   fn updater(&self) -> Updater;
+  fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync>;
 }
