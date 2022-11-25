@@ -309,7 +309,7 @@ fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
           bar.lock().render()
         }
         xcb::Event::X(x::Event::ButtonPress(ev)) => {
-          let bar = &bars_map[&ev.child().resource_id()];
+          let bar = &bars_map[&ev.event().resource_id()];
           bar.lock().click(ev.event_x().try_into().unwrap(), ev.event_y().try_into().unwrap())
         }
         xcb::Event::X(x::Event::ClientMessage(ev)) => {
