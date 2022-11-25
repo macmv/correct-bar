@@ -43,6 +43,7 @@ impl Config {
     if self.scale != 0.0 {
       panic!("UI scaling of {} already applied", self.scale);
     }
+    self.scale = scale;
     macro_rules! scale {
       ( $expr:expr, $ty:ty ) => {
         $expr = (($expr as f64) * scale) as $ty;

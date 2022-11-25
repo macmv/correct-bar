@@ -54,6 +54,14 @@ impl Rect {
     self
   }
 
+  pub fn scaled_by(mut self, scale: f64) -> Self {
+    self.pos.x = (self.pos.x as f64 * scale) as i32;
+    self.pos.y = (self.pos.x as f64 * scale) as i32;
+    self.width = (self.width as f64 * scale) as u32;
+    self.height = (self.height as f64 * scale) as u32;
+    self
+  }
+
   /// Resizes the rectangle, and keeps the center where it is. This will move
   /// the position of the rectangle.
   pub fn resize_to(&mut self, width: u32, height: u32) {

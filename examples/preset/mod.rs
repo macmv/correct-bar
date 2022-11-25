@@ -14,7 +14,7 @@ impl ModuleImpl for SepModule {
   fn padding_override(&self) -> Option<Padding> { Some(Padding::none()) }
   fn updater(&self) -> Updater { Updater::Never }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
-    ctx.draw_rect(Rect { pos: ctx.pos(), width: 100, height: ctx.height() }, SEP);
+    ctx.draw_rect(Rect { pos: ctx.pos(), width: 1, height: ctx.height() }, SEP);
     // ctx.advance_by(2);
   }
   fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }

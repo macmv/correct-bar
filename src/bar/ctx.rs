@@ -13,6 +13,8 @@ pub struct RenderContext<'a> {
   font_size:  f32,
   font_scale: f32,
 
+  ui_scale: f64,
+
   pub(super) pos: u32,
 }
 
@@ -31,6 +33,7 @@ impl<'a> RenderContext<'a> {
       click_regions,
       font_size: config.font_size,
       font_scale: 1.0,
+      ui_scale: config.scale,
       pos: padding.left,
     }
   }
@@ -89,6 +92,16 @@ impl<'a> RenderContext<'a> {
     rect.with_y(0).with_height(self.window.height())
   }
 
-  /// Draws the given rectangle. This will not advance the cursor.
-  pub fn draw_rect(&mut self, rect: Rect, color: Color) { self.buffer.draw_rect(rect, color); }
+  /// Draws the given rectangle. This will not advance the cursor. The
+  /// rectangle's position and size will be multiplied by the scale of the bar.
+  /// Use [`draw_pixel_rect`](Self::draw_pixel_rect) to skip the UI scaling.
+  pub fn draw_rect(&mut self, rect: Rect, color: Color) {
+    self.draw_pixel_rect(rect.scaled_by(self.ui_scale), color);
+  }
+
+  /// Draws the given rectangle, without advancing the cursor or applying
+  /// scaling to the rectangle.
+  pub fn draw_pixel_rect(&mut self, rect: Rect, color: Color) {
+    self.buffer.draw_rect(rect, color);
+  }
 }
