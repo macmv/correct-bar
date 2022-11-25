@@ -160,7 +160,7 @@ fn setup_window(
     wid:          window,
     parent:       screen.root(),
     x:            x + config.window.margin_left as i16,
-    y:            x + config.window.margin_top as i16,
+    y:            y + config.window.margin_top as i16,
     width:        width as u16,
     height:       config.window.height as u16,
     border_width: 0,
