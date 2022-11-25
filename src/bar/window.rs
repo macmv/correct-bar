@@ -86,14 +86,14 @@ impl AlphaBuffer {
   }
 
   pub fn draw_pixel(&mut self, pos: Pos, alpha: u8) {
-    if pos.x > 0 && pos.y > 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
+    if pos.x >= 0 && pos.y >= 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
       let i = (pos.y as u32 * self.width + pos.x as u32) as usize;
       self.data[i] = alpha;
     }
   }
 
   pub fn get_pixel(&self, pos: Pos) -> u8 {
-    if pos.x > 0 && pos.y > 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
+    if pos.x >= 0 && pos.y >= 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
       let i = (pos.y as u32 * self.width + pos.x as u32) as usize;
       self.data[i]
     } else {
@@ -249,7 +249,7 @@ impl Buffer {
 
   pub fn draw_pixel(&mut self, pos: Pos, color: Color) {
     // if i + 4 <= buf.len() {
-    if pos.x > 0 && pos.y > 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
+    if pos.x >= 0 && pos.y >= 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
       let i = (pos.y as u32 * self.width + pos.x as u32) as usize * 4;
       self.data[i] = color.b;
       self.data[i + 1] = color.g;
@@ -258,7 +258,7 @@ impl Buffer {
   }
 
   pub fn get_pixel(&self, pos: Pos) -> Color {
-    if pos.x > 0 && pos.y > 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
+    if pos.x >= 0 && pos.y >= 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
       let i = (pos.y as u32 * self.width + pos.x as u32) as usize * 4;
       Color { b: self.data[i], g: self.data[i + 1], r: self.data[i + 2] }
     } else {
