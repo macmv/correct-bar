@@ -19,7 +19,7 @@ pub fn run() {
     modules_right,
     padding: Padding { left: 20, right: 20, top: 0, bottom: 0 },
     background: Color::from_hex(0x464646),
-    font_size: 48.0,
+    font_size: 24.0,
     ..Default::default()
   };
   correct_bar::run(config)

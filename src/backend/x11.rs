@@ -290,8 +290,10 @@ fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
       continue;
     }
 
+    let mut config = config.clone();
+    config.apply_scaling_for_width(geom.width().into());
     let (window, bar) =
-      setup_window(&atoms, &conn, config.clone(), screen, root, geom.x(), geom.y(), geom.width())?;
+      setup_window(&atoms, &conn, config, screen, root, geom.x(), geom.y(), geom.width())?;
     let bar = Arc::new(Mutex::new(bar));
 
     bars_map.insert(window.resource_id(), bar.clone());
