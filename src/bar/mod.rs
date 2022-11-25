@@ -65,7 +65,7 @@ impl PositionedModule {
 
   pub fn width(&self, _config: &Config) -> u32 { self.buffer.width() }
   pub fn on_click(&self, pos: Pos) {
-    let module_pos = Pos { x: pos.x - self.pos, y: pos.y };
+    let module_pos = Pos { x: pos.x - self.pos as i32, y: pos.y };
     for region in &self.click_regions {
       if module_pos.within(region.region) {
         (region.func)();
@@ -108,7 +108,10 @@ impl Bar {
   pub fn render(&mut self) {
     macro_rules! copy_module {
       ( $module:expr ) => {
-        self.window.buffer_mut().copy_from(Pos { x: $module.pos, y: 0 }, &$module.buffer.buffer());
+        self
+          .window
+          .buffer_mut()
+          .copy_from(Pos { x: $module.pos as i32, y: 0 }, &$module.buffer.buffer());
       };
     }
 
@@ -135,7 +138,7 @@ impl Bar {
     self.update_stale_positions();
     for module in self.modules() {
       if x >= module.pos && x <= module.pos + module.buffer.width() {
-        module.on_click(Pos { x, y });
+        module.on_click(Pos { x: x as i32, y: y as i32 });
         return;
       }
     }

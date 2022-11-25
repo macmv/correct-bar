@@ -2,8 +2,8 @@ use std::ops::Add;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Pos {
-  pub x: u32,
-  pub y: u32,
+  pub x: i32,
+  pub y: i32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -14,11 +14,11 @@ pub struct Rect {
 }
 
 impl Pos {
-  pub fn with_x(mut self, x: u32) -> Self {
+  pub fn with_x(mut self, x: i32) -> Self {
     self.x = x;
     self
   }
-  pub fn with_y(mut self, y: u32) -> Self {
+  pub fn with_y(mut self, y: i32) -> Self {
     self.y = y;
     self
   }
@@ -32,16 +32,16 @@ impl Pos {
 }
 
 impl Rect {
-  pub fn left(&self) -> u32 { self.pos.x }
-  pub fn right(&self) -> u32 { self.pos.x + self.width }
-  pub fn top(&self) -> u32 { self.pos.y }
-  pub fn bottom(&self) -> u32 { self.pos.y + self.height }
+  pub fn left(&self) -> i32 { self.pos.x }
+  pub fn right(&self) -> i32 { self.pos.x + self.width as i32 }
+  pub fn top(&self) -> i32 { self.pos.y }
+  pub fn bottom(&self) -> i32 { self.pos.y + self.height as i32 }
 
-  pub fn with_x(mut self, x: u32) -> Self {
+  pub fn with_x(mut self, x: i32) -> Self {
     self.pos.x = x;
     self
   }
-  pub fn with_y(mut self, y: u32) -> Self {
+  pub fn with_y(mut self, y: i32) -> Self {
     self.pos.y = y;
     self
   }
@@ -58,14 +58,14 @@ impl Rect {
   /// the position of the rectangle.
   pub fn resize_to(&mut self, width: u32, height: u32) {
     let center = self.center();
-    self.pos.x = center.x - width / 2;
-    self.pos.y = center.y - height / 2;
+    self.pos.x = center.x - width as i32 / 2;
+    self.pos.y = center.y - height as i32 / 2;
     self.width = width;
     self.height = height;
   }
 
   pub const fn center(&self) -> Pos {
-    Pos { x: self.pos.x + self.width / 2, y: self.pos.y + self.height / 2 }
+    Pos { x: self.pos.x + self.width as i32 / 2, y: self.pos.y + self.height as i32 / 2 }
   }
 }
 

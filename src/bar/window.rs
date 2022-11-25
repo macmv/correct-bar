@@ -68,7 +68,7 @@ impl FontCache {
       let mut buf = AlphaBuffer::new(bounds.width().ceil() as u32, bounds.height().ceil() as u32);
       glyph.clone().positioned(Point { x: 0.0, y: 0.0 }).draw(|x, y, coverage| {
         if coverage > 0.0 {
-          buf.draw_pixel(Pos { x, y }, (coverage * 255.0) as u8);
+          buf.draw_pixel(Pos { x: x as i32, y: y as i32 }, (coverage * 255.0) as u8);
         }
       });
       self.glyphs.insert(glyph.id(), buf);
@@ -83,15 +83,15 @@ impl AlphaBuffer {
   }
 
   pub fn draw_pixel(&mut self, pos: Pos, alpha: u8) {
-    if pos.x < self.width && pos.y < self.height {
-      let i = (pos.y * self.width + pos.x) as usize;
+    if pos.x > 0 && pos.y > 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
+      let i = (pos.y as u32 * self.width + pos.x as u32) as usize;
       self.data[i] = alpha;
     }
   }
 
   pub fn get_pixel(&self, pos: Pos) -> u8 {
-    if pos.x < self.width && pos.y < self.height {
-      let i = (pos.y * self.width + pos.x) as usize;
+    if pos.x > 0 && pos.y > 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
+      let i = (pos.y as u32 * self.width + pos.x as u32) as usize;
       self.data[i]
     } else {
       0
@@ -131,7 +131,7 @@ impl DynamicBuffer {
       buffer.copy_from(Pos { x: 0, y: 0 }, &self.buf);
       buffer.draw_rect(
         Rect {
-          pos:    Pos { x: self.buf.width, y: 0 },
+          pos:    Pos { x: self.buf.width as i32, y: 0 },
           width:  width - self.buf.width,
           height: self.buf.height,
         },
@@ -174,7 +174,7 @@ impl DynamicBuffer {
   ) -> Rect {
     let rect = self.layout_text(font, pos, text, font_size);
 
-    self.resize(pos.x + rect.width);
+    self.resize(pos.x as u32 + rect.width);
 
     let scale = Scale::uniform(font_size);
     let mut last_glyph = None;
@@ -201,7 +201,10 @@ impl DynamicBuffer {
     Rect { pos, width: caret as u32, height: 0 }
   }
   pub fn draw_rect(&mut self, rect: Rect, color: Color) {
-    self.resize(rect.right());
+    if rect.right() < 0 {
+      return;
+    }
+    self.resize(rect.right() as u32);
     self.buf.draw_rect(rect, color);
   }
 }
@@ -214,7 +217,7 @@ impl Buffer {
   pub fn copy_from(&mut self, pos: Pos, other: &Buffer) {
     for x in 0..other.width {
       for y in 0..other.height {
-        let p = Pos { x, y };
+        let p = Pos { x: x as i32, y: y as i32 };
         self.draw_pixel(p + pos, other.get_pixel(p));
       }
     }
@@ -222,7 +225,7 @@ impl Buffer {
   pub fn copy_from_alpha(&mut self, pos: Pos, color: Color, other: &AlphaBuffer) {
     for x in 0..other.width {
       for y in 0..other.height {
-        let p = Pos { x, y };
+        let p = Pos { x: x as i32, y: y as i32 };
         let alpha = other.get_pixel(p);
         self.draw_pixel(p + pos, color.fade(self.get_pixel(p + pos), alpha));
       }
@@ -232,7 +235,7 @@ impl Buffer {
   pub fn fill(&mut self, color: Color) {
     for y in 0..self.height {
       for x in 0..self.width {
-        self.draw_pixel(Pos { x, y }, color);
+        self.draw_pixel(Pos { x: x as i32, y: y as i32 }, color);
       }
     }
   }
@@ -246,8 +249,8 @@ impl Buffer {
 
   pub fn draw_pixel(&mut self, pos: Pos, color: Color) {
     // if i + 4 <= buf.len() {
-    if pos.x < self.width && pos.y < self.height {
-      let i = (pos.y * self.width + pos.x) as usize * 4;
+    if pos.x > 0 && pos.y > 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
+      let i = (pos.y as u32 * self.width + pos.x as u32) as usize * 4;
       self.data[i] = color.b;
       self.data[i + 1] = color.g;
       self.data[i + 2] = color.r;
@@ -255,8 +258,8 @@ impl Buffer {
   }
 
   pub fn get_pixel(&self, pos: Pos) -> Color {
-    if pos.x < self.width && pos.y < self.height {
-      let i = (pos.y * self.width + pos.x) as usize * 4;
+    if pos.x > 0 && pos.y > 0 && (pos.x as u32) < self.width && (pos.y as u32) < self.height {
+      let i = (pos.y as u32 * self.width + pos.x as u32) as usize * 4;
       Color { b: self.data[i], g: self.data[i + 1], r: self.data[i + 2] }
     } else {
       Color::black()
