@@ -64,8 +64,14 @@ impl<'a> RenderContext<'a> {
     self.click_regions.push(ClickRegion { region, func: Box::new(func) });
   }
 
-  /// Advances the cursor by the given number of pixels.
+  /// Advances the cursor by the given number of pixels, affected by UI scaling.
   pub fn advance_by(&mut self, pixels: u32) {
+    self.advance_by_pixels((pixels as f64 * self.ui_scale) as u32);
+  }
+
+  /// Advances the cursor by the given number of pixels. This will not apply UI
+  /// scaling.
+  pub fn advance_by_pixels(&mut self, pixels: u32) {
     self.pos += pixels;
     if self.pos + self.padding.right > self.buffer.width() {
       self.buffer.resize(self.pos + self.padding.right);
@@ -78,7 +84,7 @@ impl<'a> RenderContext<'a> {
     let size = self.effective_font_size();
     let pos = Pos { x: self.pos as i32, y: (self.window.height() - self.height() / 5) as i32 };
     let rect = self.buffer.layout_text(self.window.font_mut(), pos, text, size);
-    self.advance_by(rect.width);
+    self.advance_by_pixels(rect.width);
     rect.with_y(0).with_height(self.window.height())
   }
 
@@ -88,7 +94,7 @@ impl<'a> RenderContext<'a> {
     let size = self.effective_font_size();
     let pos = Pos { x: self.pos as i32, y: (self.window.height() - self.height() / 5) as i32 };
     let rect = self.buffer.draw_text(self.window.font_mut(), pos, text, size, color);
-    self.advance_by(rect.width);
+    self.advance_by_pixels(rect.width);
     rect.with_y(0).with_height(self.window.height())
   }
 
