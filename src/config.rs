@@ -53,6 +53,10 @@ impl Config {
     scale!(self.window.margin_left, u32);
     scale!(self.window.margin_right, u32);
     scale!(self.window.margin_bottom, u32);
+    scale!(self.padding.top, u32);
+    scale!(self.padding.left, u32);
+    scale!(self.padding.right, u32);
+    scale!(self.padding.bottom, u32);
     scale!(self.font_size, f32);
   }
 }
