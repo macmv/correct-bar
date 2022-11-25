@@ -1,6 +1,6 @@
 use crate::bar::{Color, Module, Padding};
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Config {
   pub window:     WindowConfig,
   pub background: Color,
@@ -18,7 +18,7 @@ pub struct Config {
   pub modules_right:  Vec<Module>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct WindowConfig {
   pub height:         u32,
   /// All settings should be set assuming the window monitor will be this wide.
