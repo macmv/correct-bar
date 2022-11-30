@@ -13,7 +13,7 @@ pub fn run(config: Config) {
   let mut sleep_modules = vec![];
   let mut channel_modules = vec![];
 
-  for (bar_index, bar) in bars.iter().enumerate() {
+  for bar in &bars {
     let mut b = bar.lock();
 
     let mut all_modules = vec![];
@@ -32,7 +32,7 @@ pub fn run(config: Config) {
           sleep_modules.push(key);
         }
         Updater::Channel(recv) => {
-          channel_modules.push((key, bar_index, recv));
+          channel_modules.push((key, recv));
         }
       }
     }
@@ -46,14 +46,16 @@ pub fn run(config: Config) {
     let bars = bars.clone();
     std::thread::spawn(move || loop {
       let mut sel = crossbeam_channel::Select::new();
-      channel_modules.iter().for_each(|(_, _, chan)| {
+      channel_modules.iter().for_each(|(_, chan)| {
         sel.recv(chan);
       });
       let idx = sel.ready();
-      while let Ok(_) = channel_modules[idx].2.try_recv() {}
-      let mut b = bars[channel_modules[idx].1].lock();
-      b.update_module(channel_modules[idx].0);
-      b.render();
+      while let Ok(_) = channel_modules[idx].1.try_recv() {}
+      for bar in &bars {
+        let mut b = bar.lock();
+        b.update_module(channel_modules[idx].0);
+        b.render();
+      }
     });
   }
 
