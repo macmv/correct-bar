@@ -1,4 +1,4 @@
-use std::ops::Add;
+use std::ops::{Add, Mul, Sub};
 
 #[derive(Clone, Copy, Debug)]
 pub struct Pos {
@@ -29,6 +29,15 @@ impl Pos {
       && self.x <= rect.right()
       && self.y <= rect.bottom()
   }
+
+  pub fn scaled_by(mut self, scale: f64) -> Self {
+    self.x = (self.x as f64 * scale) as i32;
+    self.y = (self.y as f64 * scale) as i32;
+    self
+  }
+
+  pub fn max(self, other: Pos) -> Pos { Pos { x: self.x.max(other.x), y: self.y.max(other.y) } }
+  pub fn min(self, other: Pos) -> Pos { Pos { x: self.x.min(other.x), y: self.y.min(other.y) } }
 }
 
 impl Rect {
@@ -82,4 +91,20 @@ impl Add for Pos {
 
   #[track_caller]
   fn add(self, rhs: Self) -> Self::Output { Pos { x: self.x + rhs.x, y: self.y + rhs.y } }
+}
+
+impl Sub for Pos {
+  type Output = Self;
+
+  #[track_caller]
+  fn sub(self, rhs: Self) -> Self::Output { Pos { x: self.x - rhs.x, y: self.y - rhs.y } }
+}
+
+impl Mul<f64> for Pos {
+  type Output = Self;
+
+  #[track_caller]
+  fn mul(self, rhs: f64) -> Self::Output {
+    Pos { x: (self.x as f64 * rhs) as i32, y: (self.y as f64 * rhs) as i32 }
+  }
 }

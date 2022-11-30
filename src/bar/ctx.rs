@@ -110,4 +110,16 @@ impl<'a> RenderContext<'a> {
   pub fn draw_pixel_rect(&mut self, rect: Rect, color: Color) {
     self.buffer.draw_rect(rect, color);
   }
+
+  pub fn draw_triangle(&mut self, a: Pos, b: Pos, c: Pos, color: Color) {
+    self.draw_pixel_triangle(
+      a.scaled_by(self.ui_scale),
+      b.scaled_by(self.ui_scale),
+      c.scaled_by(self.ui_scale),
+      color,
+    );
+  }
+  pub fn draw_pixel_triangle(&mut self, a: Pos, b: Pos, c: Pos, color: Color) {
+    self.buffer.draw_triangle(a, b, c, color);
+  }
 }

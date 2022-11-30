@@ -207,6 +207,14 @@ impl DynamicBuffer {
     self.resize(rect.right() as u32);
     self.buf.draw_rect(rect, color);
   }
+  pub fn draw_triangle(&mut self, a: Pos, b: Pos, c: Pos, color: Color) {
+    let right = a.x.max(b.x).max(c.x);
+    if right < 0 {
+      return;
+    }
+    self.resize(right as u32);
+    self.buf.draw_triangle(a, b, c, color);
+  }
 }
 
 impl Buffer {
@@ -242,6 +250,39 @@ impl Buffer {
   pub fn draw_rect(&mut self, rect: Rect, color: Color) {
     for y in rect.top()..rect.bottom() {
       for x in rect.left()..rect.right() {
+        self.draw_pixel(Pos { x, y }, color);
+      }
+    }
+  }
+  pub fn draw_triangle(&mut self, a: Pos, b: Pos, c: Pos, color: Color) {
+    if a.x == b.x && a.x == c.x {
+      return;
+    }
+    let mut points = [a, b, c];
+    points.sort_unstable_by(|a, b| a.x.cmp(&b.x));
+
+    let left = points[0];
+    let middle = points[1];
+    let right = points[2];
+
+    let top = a.y.min(b.y).min(c.y);
+    let bot = a.y.max(b.y).max(c.y);
+
+    fn lerp(a: Pos, b: Pos, fac: f64) -> Pos { (b - a) * fac + a }
+
+    for y in top..bot {
+      let (min_x, max_x) = if y < middle.y {
+        (
+          lerp(middle, left, y as f64 / left.y as f64).x,
+          lerp(middle, right, y as f64 / left.y as f64).x,
+        )
+      } else {
+        (
+          lerp(middle, left, y as f64 / left.y as f64).x,
+          lerp(middle, right, y as f64 / left.y as f64).x,
+        )
+      };
+      for x in min_x..max_x {
         self.draw_pixel(Pos { x, y }, color);
       }
     }
