@@ -17,7 +17,7 @@ impl Clone for Train {
 }
 
 impl ModuleImpl for Train {
-  fn updater(&self) -> Updater { Updater::Every(Duration::from_millis(50)) }
+  fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     let pos = {
       let mut pos = self.pos.lock();
@@ -44,8 +44,8 @@ impl ModuleImpl for Train {
     // smoke stack
     ctx.draw_rect(Rect { pos: pos!(18, 7), width: 5, height: 3 }, self.primary);
 
-    let smoke_1 = if (pos % 8).abs() < 4 { 1 } else { 0 };
-    let smoke_2 = if (pos % 8).abs() < 4 { 0 } else { 1 };
+    let smoke_1 = if (pos % 2).abs() > 0 { 1 } else { 0 };
+    let smoke_2 = if (pos % 2).abs() > 0 { 0 } else { 1 };
     // smoke
     ctx.draw_rect(Rect { pos: pos!(20, 5), width: 3, height: 1 }, self.primary);
     ctx.draw_rect(Rect { pos: pos!(21, 4), width: 3, height: 1 }, self.primary);
