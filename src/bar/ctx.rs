@@ -78,6 +78,11 @@ impl<'a> RenderContext<'a> {
     }
   }
 
+  pub fn set_max_width(&mut self, width: u32) {
+    self.set_max_width_pixels((width as f64 * self.ui_scale) as u32);
+  }
+  pub fn set_max_width_pixels(&mut self, width: u32) { self.buffer.set_max_width(width); }
+
   /// Advances the text drawing by the width of the given text. This can be used
   /// to add a space which is the width of some text.
   pub fn advance_text(&mut self, text: &str) -> Rect {

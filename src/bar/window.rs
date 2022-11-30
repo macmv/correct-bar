@@ -29,6 +29,7 @@ pub struct Buffer {
 /// A buffer that will resize when drawn to. This one will only resize
 /// horizontally, because this bar is horizontal.
 pub struct DynamicBuffer {
+  max_width:  Option<u32>,
   buf:        Buffer,
   background: Color,
 }
@@ -113,7 +114,7 @@ impl fmt::Debug for DynamicBuffer {
 
 impl DynamicBuffer {
   pub fn new(height: u32, background: Color) -> Self {
-    DynamicBuffer { buf: Buffer::new(0, height), background }
+    DynamicBuffer { max_width: None, buf: Buffer::new(0, height), background }
   }
 
   #[inline]
@@ -128,7 +129,19 @@ impl DynamicBuffer {
     self.buf.fill(color);
   }
 
-  pub fn resize(&mut self, width: u32) {
+  pub fn set_max_width(&mut self, width: u32) {
+    self.max_width = Some(width);
+    if self.buf.width > width {
+      self.shrink_to(width);
+    }
+  }
+
+  pub fn resize(&mut self, mut width: u32) {
+    if let Some(max_width) = self.max_width {
+      if width > max_width {
+        width = max_width;
+      }
+    }
     if width > self.buf.width {
       let mut buffer = Buffer::new(width, self.buf.height);
       buffer.copy_from(Pos { x: 0, y: 0 }, &self.buf);
@@ -140,6 +153,13 @@ impl DynamicBuffer {
         },
         self.background,
       );
+      std::mem::swap(&mut self.buf, &mut buffer);
+    }
+  }
+  pub fn shrink_to(&mut self, width: u32) {
+    if width < self.buf.width {
+      let mut buffer = Buffer::new(width, self.buf.height);
+      buffer.copy_from(Pos { x: 0, y: 0 }, &self.buf);
       std::mem::swap(&mut self.buf, &mut buffer);
     }
   }
