@@ -2,27 +2,31 @@ use correct_bar::{
   bar::{Color, ModuleImpl, Updater},
   math::{Pos, Rect},
 };
-use std::{cell::RefCell, time::Duration};
+use parking_lot::Mutex;
+use std::time::Duration;
 
-thread_local! {
-  static POS: RefCell<i32> = RefCell::new(0);
-}
-
-#[derive(Clone)]
 pub struct Train {
   pub primary: Color,
+  pub pos:     Mutex<i32>,
 }
+
+impl Clone for Train {
+  fn clone(&self) -> Self {
+    Train { primary: self.primary, pos: Mutex::new(self.pos.lock().clone()) }
+  }
+}
+
 impl ModuleImpl for Train {
-  fn updater(&self) -> Updater { Updater::Every(Duration::from_millis(100)) }
+  fn updater(&self) -> Updater { Updater::Every(Duration::from_millis(50)) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
-    let pos = POS.with(|pos| {
-      let mut pos = pos.borrow_mut();
-      if *pos == -65 {
+    let pos = {
+      let mut pos = self.pos.lock();
+      if *pos <= -65 {
         *pos = 100;
       }
       *pos -= 1;
       *pos
-    });
+    };
 
     macro_rules! pos {
       ( $x:expr, $y:expr ) => {
@@ -39,13 +43,19 @@ impl ModuleImpl for Train {
 
     // smoke stack
     ctx.draw_rect(Rect { pos: pos!(18, 7), width: 5, height: 3 }, self.primary);
+
+    let smoke_1 = if (pos % 8).abs() < 4 { 1 } else { 0 };
+    let smoke_2 = if (pos % 8).abs() < 4 { 0 } else { 1 };
     // smoke
     ctx.draw_rect(Rect { pos: pos!(20, 5), width: 3, height: 1 }, self.primary);
     ctx.draw_rect(Rect { pos: pos!(21, 4), width: 3, height: 1 }, self.primary);
     ctx.draw_rect(Rect { pos: pos!(23, 3), width: 3, height: 1 }, self.primary);
-    ctx.draw_rect(Rect { pos: pos!(26, 2), width: 4, height: 1 }, self.primary);
-    ctx.draw_rect(Rect { pos: pos!(30, 3), width: 4, height: 1 }, self.primary);
-    ctx.draw_rect(Rect { pos: pos!(34, 2), width: 4, height: 1 }, self.primary);
+    ctx.draw_rect(Rect { pos: pos!(26, 2 + smoke_1), width: 4, height: 1 }, self.primary);
+    ctx.draw_rect(Rect { pos: pos!(30, 2 + smoke_2), width: 4, height: 1 }, self.primary);
+    ctx.draw_rect(Rect { pos: pos!(34, 2 + smoke_1), width: 4, height: 1 }, self.primary);
+    ctx.draw_rect(Rect { pos: pos!(38, 2 + smoke_2), width: 4, height: 1 }, self.primary);
+    ctx.draw_rect(Rect { pos: pos!(42, 2 + smoke_1), width: 4, height: 1 }, self.primary);
+    ctx.draw_rect(Rect { pos: pos!(46, 2 + smoke_2), width: 4, height: 1 }, self.primary);
 
     // thing on the back of the main car
     ctx.draw_rect(Rect { pos: pos!(30, 8), width: 12, height: 5 }, self.primary);

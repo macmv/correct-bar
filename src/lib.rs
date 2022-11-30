@@ -9,14 +9,15 @@ use config::Config;
 pub fn run(config: Config) {
   let bars = backend::x11::setup(config);
 
+  let mut all_modules = vec![];
   let mut sleep_duration = None;
   let mut sleep_modules = vec![];
   let mut channel_modules = vec![];
 
-  for bar in &bars {
-    let mut b = bar.lock();
+  {
+    let bar = &bars[0];
+    let b = bar.lock();
 
-    let mut all_modules = vec![];
     for (key, module) in b.all_modules() {
       all_modules.push(key);
       match module.imp().updater() {
@@ -36,8 +37,12 @@ pub fn run(config: Config) {
         }
       }
     }
-    for key in all_modules {
-      b.update_module(key);
+  }
+  for bar in &bars {
+    let mut b = bar.lock();
+
+    for key in &all_modules {
+      b.update_module(*key);
     }
     b.render();
   }
