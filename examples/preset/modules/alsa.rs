@@ -270,6 +270,20 @@ impl<'control> Mixer<'control> {
   }
 }
 
+#[repr(i32)]
+enum Channel {
+  Unknown   = -1,
+  FrontLeft = 0,
+  FrontRight,
+  RearLeft,
+  RearRight,
+  FrontCenter,
+  Woofer,
+  SideLeft,
+  SideRight,
+  RearCenter,
+}
+
 impl MixerElem<'_> {
   pub fn name(&self) -> String {
     unsafe {
@@ -278,6 +292,22 @@ impl MixerElem<'_> {
         panic!("got null ptr from mixer name");
       }
       CStr::from_ptr(ptr).to_str().unwrap().to_string()
+    }
+  }
+
+  pub fn has_playback_channel(&self, channel: Channel) -> bool {
+    unsafe { alsa::snd_mixer_selem_has_playback_channel(self.ptr, channel as i32) != 0 }
+  }
+
+  pub fn playback_volume(&self, channel: Channel) -> Option<i64> {
+    unsafe {
+      let mut volume = 0;
+      let res = alsa::snd_mixer_selem_get_playback_volume(self.ptr, channel as i32, &mut volume);
+      if res < 0 {
+        None
+      } else {
+        Some(volume)
+      }
     }
   }
 }
@@ -316,7 +346,8 @@ impl ALSA {
 
       let mixer = Mixer::new(&control)?;
       for elem in mixer.elems()? {
-        dbg!(elem);
+        dbg!(elem.playback_volume(Channel::FrontLeft));
+        dbg!(&elem);
       }
 
       /*
