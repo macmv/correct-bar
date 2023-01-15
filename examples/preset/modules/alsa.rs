@@ -57,7 +57,8 @@ impl Drop for ControlCardInfo {
 }
 
 struct Control {
-  ptr: *mut alsa::snd_ctl_t,
+  ptr:  *mut alsa::snd_ctl_t,
+  name: String,
 }
 struct ControlElemList<'control> {
   control: &'control Control,
@@ -78,14 +79,17 @@ struct ControlElemID(*mut alsa::snd_ctl_elem_id_t);
 impl Control {
   pub fn new(id: i32) -> Result<Self> {
     unsafe {
-      let name = CString::new(format!("hw:{id}")).unwrap();
+      let name = format!("hw:{id}");
+      let name_cstr = CString::new(name.clone()).unwrap();
 
       let mut ctl: *mut alsa::snd_ctl_t = std::ptr::null_mut();
-      check!(alsa::snd_ctl_open(&mut ctl, name.as_ptr(), 1))?;
+      check!(alsa::snd_ctl_open(&mut ctl, name_cstr.as_ptr(), 1))?;
 
-      Ok(Control { ptr: ctl })
+      Ok(Control { ptr: ctl, name })
     }
   }
+
+  pub fn name(&self) -> &str { &self.name }
 
   pub fn info(&self) -> Result<ControlCardInfo> {
     unsafe {
@@ -226,6 +230,60 @@ impl<'list, 'control> Iterator for ControlElemIter<'list, 'control> {
   }
 }
 
+struct Mixer<'control> {
+  ptr:      *mut alsa::snd_mixer_t,
+  _phantom: std::marker::PhantomData<&'control Control>,
+}
+struct MixerElem<'control> {
+  ptr:      *mut alsa::snd_mixer_elem_t,
+  _phantom: std::marker::PhantomData<&'control Control>,
+}
+
+impl<'control> Mixer<'control> {
+  pub fn new(control: &'control Control) -> Result<Self> {
+    unsafe {
+      let mut mixer: *mut alsa::snd_mixer_t = std::ptr::null_mut();
+      check!(alsa::snd_mixer_open(&mut mixer, 1))?;
+
+      let name = CString::new(control.name()).unwrap();
+      check!(alsa::snd_mixer_attach(mixer, name.as_ptr()))?;
+      check!(alsa::snd_mixer_selem_register(mixer, std::ptr::null_mut(), std::ptr::null_mut()))?;
+      check!(alsa::snd_mixer_load(mixer))?;
+
+      Ok(Mixer { ptr: mixer, _phantom: Default::default() })
+    }
+  }
+
+  pub fn elems(&self) -> Result<Vec<MixerElem<'control>>> {
+    unsafe {
+      let mut elem = alsa::snd_mixer_first_elem(self.ptr);
+      dbg!(&elem);
+      let mut elems = vec![];
+      while !elem.is_null() {
+        elems.push(MixerElem { ptr: elem, _phantom: Default::default() });
+
+        elem = alsa::snd_mixer_elem_next(elem);
+      }
+
+      Ok(elems)
+    }
+  }
+}
+
+impl fmt::Debug for MixerElem<'_> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("MixerElem").field("foo", &3).finish()
+  }
+}
+
+impl Drop for Mixer<'_> {
+  fn drop(&mut self) {
+    unsafe {
+      alsa::snd_mixer_close(self.ptr);
+    }
+  }
+}
+
 impl ALSA {
   pub fn new() -> Self { Self::new_inner().unwrap() }
 
@@ -237,9 +295,15 @@ impl ALSA {
       let card = id;
 
       let control = Control::new(id)?;
-
+      /*
       for elem in control.elems()?.iter() {
         elem.value()?;
+        dbg!(elem);
+      }
+      */
+
+      let mixer = Mixer::new(&control)?;
+      for elem in mixer.elems()? {
         dbg!(elem);
       }
 
