@@ -270,9 +270,21 @@ impl<'control> Mixer<'control> {
   }
 }
 
+impl MixerElem<'_> {
+  pub fn name(&self) -> String {
+    unsafe {
+      let ptr = alsa::snd_mixer_selem_get_name(self.ptr);
+      if ptr.is_null() {
+        panic!("got null ptr from mixer name");
+      }
+      CStr::from_ptr(ptr).to_str().unwrap().to_string()
+    }
+  }
+}
+
 impl fmt::Debug for MixerElem<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_struct("MixerElem").field("foo", &3).finish()
+    f.debug_struct("MixerElem").field("name", &self.name()).finish()
   }
 }
 
