@@ -45,44 +45,15 @@ impl fmt::Debug for ALSAError {
   }
 }
 
-struct ControlCardInfo(*mut alsa::snd_ctl_card_info_t);
-
-impl fmt::Debug for ControlCardInfo {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "control card info here") }
-}
-
-impl Drop for ControlCardInfo {
-  fn drop(&mut self) {
-    unsafe {
-      alsa::snd_ctl_card_info_free(self.0);
-    }
-  }
-}
-
 struct Control {
   ptr:  *mut alsa::snd_ctl_t,
   name: String,
 }
-struct ControlElemList<'control> {
-  control: &'control Control,
-  ptr:     *mut alsa::snd_ctl_elem_list_t,
-}
-struct ControlElem<'list, 'control> {
-  list:  &'list ControlElemList<'control>,
-  // SAFETY: This index must be valid
-  index: u32,
-}
-struct Value<'control> {
-  control: &'control Control,
-  ptr:     *mut alsa::snd_ctl_elem_value_t,
-}
-
-struct ControlElemID(*mut alsa::snd_ctl_elem_id_t);
 
 impl Control {
   pub fn new_name(name: &str) -> Result<Self> {
     unsafe {
-      let name = CString::new("Generic").unwrap();
+      let name = CString::new(name).unwrap();
       let id = check!(alsa::snd_card_get_index(name.as_ptr()))?;
 
       Self::new(id)
@@ -101,143 +72,13 @@ impl Control {
   }
 
   pub fn name(&self) -> &str { &self.name }
-
-  pub fn info(&self) -> Result<ControlCardInfo> {
-    unsafe {
-      let mut info: *mut alsa::snd_ctl_card_info_t = std::ptr::null_mut();
-      check!(alsa::snd_ctl_card_info_malloc(&mut info))?;
-      check!(alsa::snd_ctl_card_info(self.ptr, info))?;
-
-      Ok(ControlCardInfo(info))
-    }
-  }
-
-  pub fn elems(&self) -> Result<ControlElemList> {
-    unsafe {
-      let mut list: *mut alsa::snd_ctl_elem_list_t = std::ptr::null_mut();
-      check!(alsa::snd_ctl_elem_list_malloc(&mut list))?;
-
-      // sets the length of the list
-      check!(alsa::snd_ctl_elem_list(self.ptr, list))?;
-      let len = alsa::snd_ctl_elem_list_get_count(list);
-
-      // allocate space for identifiers
-      check!(alsa::snd_ctl_elem_list_alloc_space(list, len))?;
-      // call this again, to copy in the identifiers, which will let us actually use
-      // the list.
-      check!(alsa::snd_ctl_elem_list(self.ptr, list))?;
-
-      Ok(ControlElemList { control: &self, ptr: list })
-    }
-  }
 }
 
-impl Drop for ControlElemList<'_> {
+impl Drop for Control {
   fn drop(&mut self) {
     unsafe {
-      // free space for identifiers and the list itself.
-      alsa::snd_ctl_elem_list_free_space(self.ptr);
-      alsa::snd_ctl_elem_list_free(self.ptr);
+      alsa::snd_ctl_close(self.ptr);
     }
-  }
-}
-
-impl ControlElemList<'_> {
-  pub fn len(&self) -> u32 { unsafe { alsa::snd_ctl_elem_list_get_count(self.ptr) } }
-  pub fn iter(&self) -> ControlElemIter {
-    ControlElemIter { index: 0, len: self.len(), list: &self }
-  }
-  pub fn to_vec(&self) -> Vec<ControlElem> { self.iter().collect() }
-}
-
-impl ControlElem<'_, '_> {
-  pub fn name(&self) -> String {
-    unsafe {
-      let ptr = alsa::snd_ctl_elem_list_get_name(self.list.ptr, self.index);
-      if ptr.is_null() {
-        panic!("got null ptr from elem list name");
-      }
-      CStr::from_ptr(ptr).to_str().unwrap().to_string()
-    }
-  }
-  pub fn device(&self) -> u32 {
-    unsafe { alsa::snd_ctl_elem_list_get_device(self.list.ptr, self.index) }
-  }
-  /*
-  pub fn interface(&self) -> Interface {
-    unsafe {
-      check!(alsa::snd_ctl_elem_list_get_device(self.list.0, self.index)).unwrap();
-    }
-  }
-  */
-  pub fn id(&self) -> Result<ControlElemID> {
-    unsafe {
-      let mut id: *mut alsa::snd_ctl_elem_id_t = std::ptr::null_mut();
-      check!(alsa::snd_ctl_elem_id_malloc(&mut id))?;
-      alsa::snd_ctl_elem_list_get_id(self.list.ptr, self.index, id);
-
-      Ok(ControlElemID(id))
-    }
-  }
-
-  pub fn value(&self) -> Result<Value> {
-    unsafe {
-      let mut value: *mut alsa::snd_ctl_elem_value_t = std::ptr::null_mut();
-      check!(alsa::snd_ctl_elem_value_malloc(&mut value))?;
-      alsa::snd_ctl_elem_value_set_id(value, self.id()?.0);
-
-      check!(alsa::snd_ctl_elem_read(self.list.control.ptr, value))?;
-
-      Ok(Value { control: self.list.control, ptr: value })
-    }
-  }
-}
-
-impl fmt::Debug for ControlElem<'_, '_> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_struct("ControlElem")
-      .field("name", &self.name())
-      .field("device", &self.device())
-      .field("value", &self.value().unwrap())
-      .finish()
-  }
-}
-
-impl Value<'_> {
-  pub fn as_int(&self) -> i64 { unsafe { alsa::snd_ctl_elem_value_get_integer(self.ptr, 0) } }
-}
-
-impl fmt::Debug for Value<'_> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_struct("Value").field("int", &self.as_int()).finish()
-  }
-}
-
-impl Drop for ControlElemID {
-  fn drop(&mut self) {
-    unsafe {
-      alsa::snd_ctl_elem_id_free(self.0);
-    }
-  }
-}
-
-struct ControlElemIter<'list, 'control> {
-  index: u32,
-  len:   u32,
-  list:  &'list ControlElemList<'control>,
-}
-
-impl<'list, 'control> Iterator for ControlElemIter<'list, 'control> {
-  type Item = ControlElem<'list, 'control>;
-
-  fn next(&mut self) -> Option<Self::Item> {
-    if self.index >= self.len {
-      return None;
-    }
-
-    let ret = ControlElem { list: self.list, index: self.index };
-    self.index += 1;
-    Some(ret)
   }
 }
 
