@@ -30,14 +30,14 @@ pub fn modules(include_bspwm: bool) -> (Vec<Module>, Vec<Module>, Vec<Module>) {
         SepModule.into(),
         modules::Train { primary: SEP, pos: 0.into() }.into(),
         SepModule.into(),
-        Module::text("100%", Color { r: 100, g: 255, b: 128 }).into(),
+        modules::ALSA::new().into(),
       ]
     } else {
       vec![
         SepModule.into(),
         modules::Train { primary: SEP, pos: 0.into() }.into(),
         SepModule.into(),
-        Module::text("100%", Color { r: 100, g: 255, b: 128 }).into(),
+        modules::ALSA::new().into(),
       ]
     },
     vec![
