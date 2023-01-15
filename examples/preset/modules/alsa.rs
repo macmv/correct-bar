@@ -165,6 +165,7 @@ enum Channel {
   RearCenter,
 }
 
+#[allow(unused)]
 impl<'control> MixerElem<'_, 'control> {
   pub fn name(&self) -> String {
     unsafe {
@@ -185,9 +186,33 @@ impl<'control> MixerElem<'_, 'control> {
     }
   }
 
-  #[allow(unused)]
   pub fn has_playback_channel(&self, channel: Channel) -> bool {
     unsafe { alsa::snd_mixer_selem_has_playback_channel(self.ptr, channel as i32) != 0 }
+  }
+
+  pub fn db_range(&self) -> Option<(i64, i64)> {
+    unsafe {
+      let mut min = 0;
+      let mut max = 0;
+      let res = alsa::snd_mixer_selem_get_playback_dB_range(self.ptr, &mut min, &mut max);
+      if res < 0 {
+        None
+      } else {
+        Some((min, max))
+      }
+    }
+  }
+
+  pub fn playback_db(&self, channel: Channel) -> Option<i64> {
+    unsafe {
+      let mut db = 0;
+      let res = alsa::snd_mixer_selem_get_playback_dB(self.ptr, channel as i32, &mut db);
+      if res < 0 {
+        None
+      } else {
+        Some(db)
+      }
+    }
   }
 
   pub fn playback_volume(&self, channel: Channel) -> Option<i64> {
@@ -270,7 +295,14 @@ impl ALSA {
     let control = self.control.lock();
     let mixer = Mixer::new(&control).unwrap();
     let elem = mixer.get(&self.elem).unwrap();
-    elem.playback_volume(Channel::FrontLeft).unwrap() as f64 / 87.0
+
+    let (min, max) = elem.db_range().unwrap();
+    let (min, max) = (min as f64, max as f64);
+    let volume = elem.playback_db(Channel::FrontLeft).unwrap() as f64;
+    // See alsa-utils/alsamixer/volume_mapping.c. This is the normalized volume.
+    let norm = 10.0_f64.powf((volume - max) / 6000.0);
+    let min_norm = 10.0_f64.powf((min - max) / 6000.0);
+    (norm - min_norm) / (1.0 - min_norm)
   }
 }
 
