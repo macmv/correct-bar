@@ -12,9 +12,9 @@ use std::{
 
 #[derive(Clone)]
 pub struct ALSA {
-  mixer: Arc<Mutex<Mixer<'static>>>,
-  elem:  MixerElemID<'static>,
-  color: Color,
+  control: Arc<Mutex<Control>>,
+  elem:    MixerElemID,
+  color:   Color,
 }
 
 macro_rules! check {
@@ -49,6 +49,8 @@ struct Control {
   ptr:  *mut alsa::snd_ctl_t,
   name: String,
 }
+
+unsafe impl Send for Control {}
 
 impl Control {
   pub fn new_name(name: &str) -> Result<Self> {
@@ -91,15 +93,14 @@ struct MixerElem<'mixer, 'control> {
   _phantom: std::marker::PhantomData<&'mixer Mixer<'control>>,
 }
 #[derive(Clone)]
-struct MixerElemID<'control> {
-  ptr:      *mut alsa::snd_mixer_selem_id_t,
-  _phantom: std::marker::PhantomData<&'control Control>,
+struct MixerElemID {
+  ptr: *mut alsa::snd_mixer_selem_id_t,
 }
 
 unsafe impl Send for Mixer<'_> {}
 unsafe impl Send for MixerElem<'_, '_> {}
-unsafe impl Send for MixerElemID<'_> {}
-unsafe impl Sync for MixerElemID<'_> {}
+unsafe impl Send for MixerElemID {}
+unsafe impl Sync for MixerElemID {}
 
 impl<'control> Mixer<'control> {
   pub fn new(control: &'control Control) -> Result<Self> {
@@ -131,10 +132,7 @@ impl<'control> Mixer<'control> {
     }
   }
 
-  pub fn get<'mixer>(
-    &'mixer self,
-    id: &MixerElemID<'control>,
-  ) -> Option<MixerElem<'mixer, 'control>> {
+  pub fn get<'mixer>(&'mixer self, id: &MixerElemID) -> Option<MixerElem<'mixer, 'control>> {
     unsafe {
       let elem = alsa::snd_mixer_find_selem(self.ptr, id.ptr);
       if elem.is_null() {
@@ -171,13 +169,13 @@ impl<'control> MixerElem<'_, 'control> {
       CStr::from_ptr(ptr).to_str().unwrap().to_string()
     }
   }
-  pub fn id(&self) -> Result<MixerElemID<'control>> {
+  pub fn id(&self) -> Result<MixerElemID> {
     unsafe {
       let mut id: *mut alsa::snd_mixer_selem_id_t = std::ptr::null_mut();
       check!(alsa::snd_mixer_selem_id_malloc(&mut id))?;
       alsa::snd_mixer_selem_get_id(self.ptr, id);
 
-      Ok(MixerElemID { ptr: id, _phantom: Default::default() })
+      Ok(MixerElemID { ptr: id })
     }
   }
 
@@ -217,27 +215,31 @@ impl ALSA {
   pub fn new() -> Self { Self::new_inner().unwrap() }
 
   fn new_inner() -> Result<Self> {
-    let control = Box::leak(Box::new(Control::new_name("Generic")?));
+    let control = Control::new_name("Generic")?;
 
-    let mixer = Mixer::new(control)?;
-    let mut elem = None;
-    for e in mixer.elems()? {
-      if e.name() == "Master" {
-        elem = Some(e.id()?);
-        break;
+    let elem = {
+      let mixer = Mixer::new(&control)?;
+      let mut elem = None;
+      for e in mixer.elems()? {
+        if e.name() == "Master" {
+          elem = Some(e.id()?);
+          break;
+        }
       }
-    }
+      elem
+    };
 
     Ok(ALSA {
-      mixer: Arc::new(Mutex::new(mixer)),
-      elem:  elem.expect("could not find control"),
-      color: Color { r: 100, g: 255, b: 128 },
+      control: Arc::new(Mutex::new(control)),
+      elem:    elem.expect("could not find control"),
+      color:   Color { r: 100, g: 255, b: 128 },
     })
   }
 
   pub fn volume(&self) -> f64 {
-    let lock = self.mixer.lock();
-    let elem = lock.get(&self.elem).unwrap();
+    let control = self.control.lock();
+    let mixer = Mixer::new(&control).unwrap();
+    let elem = mixer.get(&self.elem).unwrap();
     elem.playback_volume(Channel::FrontLeft).unwrap() as f64
   }
 }
