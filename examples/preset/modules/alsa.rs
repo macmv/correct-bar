@@ -135,11 +135,24 @@ impl ControlElem<'_> {
       CStr::from_ptr(ptr).to_str().unwrap().to_string()
     }
   }
+  pub fn device(&self) -> u32 {
+    unsafe { alsa::snd_ctl_elem_list_get_device(self.list.0, self.index) }
+  }
+  /*
+  pub fn interface(&self) -> Interface {
+    unsafe {
+      check!(alsa::snd_ctl_elem_list_get_device(self.list.0, self.index)).unwrap();
+    }
+  }
+  */
 }
 
 impl fmt::Debug for ControlElem<'_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_struct("ControlElem").field("name", &self.name()).finish()
+    f.debug_struct("ControlElem")
+      .field("name", &self.name())
+      .field("device", &self.device())
+      .finish()
   }
 }
 
