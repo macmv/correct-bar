@@ -241,6 +241,7 @@ mod json {
   #[serde(rename_all = "camelCase")]
   pub enum Layer {
     Normal,
+    Above,
   }
 
   #[derive(Clone, Debug, Deserialize)]
