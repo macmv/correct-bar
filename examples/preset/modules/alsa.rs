@@ -45,7 +45,7 @@ impl fmt::Debug for ALSAError {
 struct ControlCardInfo(*mut alsa::snd_ctl_card_info_t);
 
 impl fmt::Debug for ControlCardInfo {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "foo") }
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "control card info here") }
 }
 
 impl Drop for ControlCardInfo {
@@ -57,6 +57,13 @@ impl Drop for ControlCardInfo {
 }
 
 struct Control(*mut alsa::snd_ctl_t);
+
+struct ControlElemList(*mut alsa::snd_ctl_elem_list_t);
+struct ControlElem<'a> {
+  list:  &'a ControlElemList,
+  // SAFETY: This index must be valid
+  index: u32,
+}
 
 impl Control {
   pub fn new(id: i32) -> Result<Self> {
@@ -79,6 +86,81 @@ impl Control {
       Ok(ControlCardInfo(info))
     }
   }
+
+  pub fn elems(&self) -> Result<ControlElemList> {
+    unsafe {
+      let mut list: *mut alsa::snd_ctl_elem_list_t = std::ptr::null_mut();
+      check!(alsa::snd_ctl_elem_list_malloc(&mut list))?;
+
+      // sets the length of the list
+      check!(alsa::snd_ctl_elem_list(self.0, list))?;
+      let len = alsa::snd_ctl_elem_list_get_count(list);
+
+      // allocate space for identifiers
+      check!(alsa::snd_ctl_elem_list_alloc_space(list, len))?;
+      // call this again, to copy in the identifiers, which will let us actually use
+      // the list.
+      check!(alsa::snd_ctl_elem_list(self.0, list))?;
+
+      Ok(ControlElemList(list))
+    }
+  }
+}
+
+impl Drop for ControlElemList {
+  fn drop(&mut self) {
+    unsafe {
+      // free space for identifiers and the list itself.
+      alsa::snd_ctl_elem_list_free_space(self.0);
+      alsa::snd_ctl_elem_list_free(self.0);
+    }
+  }
+}
+
+impl ControlElemList {
+  pub fn len(&self) -> u32 { unsafe { alsa::snd_ctl_elem_list_get_count(self.0) } }
+  pub fn iter(&self) -> ControlElemIter {
+    ControlElemIter { index: 0, len: self.len(), list: &self }
+  }
+  pub fn to_vec(&self) -> Vec<ControlElem> { self.iter().collect() }
+}
+
+impl ControlElem<'_> {
+  pub fn name(&self) -> String {
+    unsafe {
+      let ptr = alsa::snd_ctl_elem_list_get_name(self.list.0, self.index);
+      if ptr.is_null() {
+        panic!("got null ptr from elem list name");
+      }
+      CStr::from_ptr(ptr).to_str().unwrap().to_string()
+    }
+  }
+}
+
+impl fmt::Debug for ControlElem<'_> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("ControlElem").field("name", &self.name()).finish()
+  }
+}
+
+struct ControlElemIter<'a> {
+  index: u32,
+  len:   u32,
+  list:  &'a ControlElemList,
+}
+
+impl<'a> Iterator for ControlElemIter<'a> {
+  type Item = ControlElem<'a>;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.index >= self.len {
+      return None;
+    }
+
+    let ret = ControlElem { list: self.list, index: self.index };
+    self.index += 1;
+    Some(ret)
+  }
 }
 
 impl ALSA {
@@ -93,7 +175,7 @@ impl ALSA {
 
       let control = Control::new(id)?;
 
-      dbg!(control.info()?);
+      dbg!(control.elems()?.to_vec());
 
       /*
       use alsa::{
