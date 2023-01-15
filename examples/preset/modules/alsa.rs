@@ -121,7 +121,6 @@ impl<'control> Mixer<'control> {
   pub fn elems<'mixer>(&'mixer self) -> Result<Vec<MixerElem<'mixer, 'control>>> {
     unsafe {
       let mut elem = alsa::snd_mixer_first_elem(self.ptr);
-      dbg!(&elem);
       let mut elems = vec![];
       while !elem.is_null() {
         elems.push(MixerElem { ptr: elem, _phantom: Default::default() });
