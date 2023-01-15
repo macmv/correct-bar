@@ -2,15 +2,17 @@
 
 use alsa_sys as alsa;
 use correct_bar::bar::{Color, ModuleImpl, Updater};
+use parking_lot::Mutex;
 use std::{
-  ffi::{c_int, CStr, CString},
+  ffi::{CStr, CString},
   fmt,
+  sync::Arc,
   time::Duration,
 };
 
 #[derive(Clone)]
 pub struct ALSA {
-  card:  c_int,
+  elem:  Arc<Mutex<MixerElem<'static, 'static>>>,
   color: Color,
 }
 
@@ -77,6 +79,14 @@ struct Value<'control> {
 struct ControlElemID(*mut alsa::snd_ctl_elem_id_t);
 
 impl Control {
+  pub fn new_name(name: &str) -> Result<Self> {
+    unsafe {
+      let name = CString::new("Generic").unwrap();
+      let id = check!(alsa::snd_card_get_index(name.as_ptr()))?;
+
+      Self::new(id)
+    }
+  }
   pub fn new(id: i32) -> Result<Self> {
     unsafe {
       let name = format!("hw:{id}");
@@ -234,10 +244,13 @@ struct Mixer<'control> {
   ptr:      *mut alsa::snd_mixer_t,
   _phantom: std::marker::PhantomData<&'control Control>,
 }
-struct MixerElem<'control> {
+struct MixerElem<'mixer, 'control> {
   ptr:      *mut alsa::snd_mixer_elem_t,
-  _phantom: std::marker::PhantomData<&'control Control>,
+  _phantom: std::marker::PhantomData<&'mixer Mixer<'control>>,
 }
+
+unsafe impl Send for Mixer<'_> {}
+unsafe impl Send for MixerElem<'_, '_> {}
 
 impl<'control> Mixer<'control> {
   pub fn new(control: &'control Control) -> Result<Self> {
@@ -254,7 +267,7 @@ impl<'control> Mixer<'control> {
     }
   }
 
-  pub fn elems(&self) -> Result<Vec<MixerElem<'control>>> {
+  pub fn elems<'mixer>(&'mixer self) -> Result<Vec<MixerElem<'mixer, 'control>>> {
     unsafe {
       let mut elem = alsa::snd_mixer_first_elem(self.ptr);
       dbg!(&elem);
@@ -284,7 +297,7 @@ enum Channel {
   RearCenter,
 }
 
-impl MixerElem<'_> {
+impl MixerElem<'_, '_> {
   pub fn name(&self) -> String {
     unsafe {
       let ptr = alsa::snd_mixer_selem_get_name(self.ptr);
@@ -312,7 +325,7 @@ impl MixerElem<'_> {
   }
 }
 
-impl fmt::Debug for MixerElem<'_> {
+impl fmt::Debug for MixerElem<'_, '_> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("MixerElem").field("name", &self.name()).finish()
   }
@@ -330,78 +343,33 @@ impl ALSA {
   pub fn new() -> Self { Self::new_inner().unwrap() }
 
   fn new_inner() -> Result<Self> {
-    unsafe {
-      let name = CString::new("Generic").unwrap();
-      let id = check!(alsa::snd_card_get_index(name.as_ptr()))?;
+    let control = Box::leak(Box::new(Control::new_name("Generic")?));
 
-      let card = id;
-
-      let control = Control::new(id)?;
-      /*
-      for elem in control.elems()?.iter() {
-        elem.value()?;
-        dbg!(elem);
+    let mixer = Box::leak(Box::new(Mixer::new(control)?));
+    let mut elem = None;
+    for e in mixer.elems()? {
+      if e.name() == "Master" {
+        elem = Some(e);
+        break;
       }
-      */
-
-      let mixer = Mixer::new(&control)?;
-      for elem in mixer.elems()? {
-        dbg!(elem.playback_volume(Channel::FrontLeft));
-        dbg!(&elem);
-      }
-
-      /*
-      use alsa::{
-        pcm::{Access, Format, HwParams, State, PCM},
-        Direction, ValueOr,
-      };
-
-      // Open default playback device
-      let pcm = PCM::new("default", Direction::Playback, false).unwrap();
-
-      // Set hardware parameters: 48000 Hz / Mono / 16 bit
-      let hwp = HwParams::any(&pcm).unwrap();
-      hwp.set_channels(1).unwrap();
-      hwp.set_rate(48000, ValueOr::Nearest).unwrap();
-      hwp.set_format(Format::s16()).unwrap();
-      hwp.set_access(Access::RWInterleaved).unwrap();
-      pcm.hw_params(&hwp).unwrap();
-      let io = pcm.io_i16().unwrap();
-
-      // Make sure we don't start the stream too early
-      let hwp = pcm.hw_params_current().unwrap();
-      let swp = pcm.sw_params_current().unwrap();
-      swp.set_start_threshold(hwp.get_buffer_size().unwrap()).unwrap();
-      pcm.sw_params(&swp).unwrap();
-
-      // Make a sine wave
-      let mut buf = [0i16; 1024];
-      for (i, a) in buf.iter_mut().enumerate() {
-        *a = ((i as f32 * 2.0 * ::std::f32::consts::PI / 128.0).sin() * 8192.0) as i16
-      }
-
-      // Play it back for 2 seconds.
-      for _ in 0..2 * 48000 / 1024 {
-        assert_eq!(io.writei(&buf[..]).unwrap(), 1024);
-      }
-
-      // In case the buffer was larger than 2 seconds, start the stream manually.
-      if pcm.state() != State::Running {
-        pcm.start().unwrap()
-      };
-      // Wait for the stream to finish playback.
-      pcm.drain().unwrap();
-      */
-
-      Ok(ALSA { card, color: Color { r: 100, g: 255, b: 128 } })
     }
+
+    Ok(ALSA {
+      elem:  Arc::new(Mutex::new(elem.expect("could not find control"))),
+      color: Color { r: 100, g: 255, b: 128 },
+    })
+  }
+
+  pub fn volume(&self) -> f64 {
+    self.elem.lock().playback_volume(Channel::FrontLeft).unwrap() as f64
   }
 }
 
 impl ModuleImpl for ALSA {
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     // foo
-    ctx.draw_text("100%", self.color);
+    ctx.draw_text(&format!("{}", self.volume() * 100.0), self.color);
+    ctx.draw_text("%", self.color);
   }
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
   fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }
