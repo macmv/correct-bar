@@ -89,11 +89,13 @@ struct Mixer<'control> {
   ptr:      *mut alsa::snd_mixer_t,
   _phantom: std::marker::PhantomData<&'control Control>,
 }
+// NOTE: The Drop for Mixer will cleanup all mixer elements, so there is no drop
+// impl for MixerElem. The PhantomData is important here.
 struct MixerElem<'mixer, 'control> {
   ptr:      *mut alsa::snd_mixer_elem_t,
   _phantom: std::marker::PhantomData<&'mixer Mixer<'control>>,
 }
-#[derive(Clone)]
+// This is a mixer element ID, and is a standalone reference to a mixer element.
 struct MixerElemID {
   ptr: *mut alsa::snd_mixer_selem_id_t,
 }
@@ -146,6 +148,33 @@ impl<'control> Mixer<'control> {
   pub fn handle_callbacks(&self) {
     unsafe {
       alsa::snd_mixer_handle_events(self.ptr);
+    }
+  }
+}
+
+impl Drop for Mixer<'_> {
+  fn drop(&mut self) {
+    unsafe {
+      alsa::snd_mixer_close(self.ptr);
+    }
+  }
+}
+
+impl Clone for MixerElemID {
+  fn clone(&self) -> MixerElemID {
+    unsafe {
+      let mut new: *mut alsa::snd_mixer_selem_id_t = std::ptr::null_mut();
+      check!(alsa::snd_mixer_selem_id_malloc(&mut new)).unwrap();
+      alsa::snd_mixer_selem_id_copy(new, self.ptr);
+      MixerElemID { ptr: new }
+    }
+  }
+}
+
+impl Drop for MixerElemID {
+  fn drop(&mut self) {
+    unsafe {
+      alsa::snd_mixer_selem_id_free(self.ptr);
     }
   }
 }
@@ -250,14 +279,6 @@ impl fmt::Debug for MixerElem<'_, '_> {
   }
 }
 
-impl Drop for Mixer<'_> {
-  fn drop(&mut self) {
-    unsafe {
-      alsa::snd_mixer_close(self.ptr);
-    }
-  }
-}
-
 impl ALSA {
   pub fn new() -> Self { Self::new_inner().unwrap() }
 
@@ -279,6 +300,7 @@ impl ALSA {
       }
       std::thread::spawn(move || loop {
         mixer.handle_callbacks();
+        std::thread::sleep(std::time::Duration::from_millis(100));
       });
       elem
     };
