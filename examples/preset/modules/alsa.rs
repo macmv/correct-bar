@@ -12,7 +12,8 @@ use std::{
 
 #[derive(Clone)]
 pub struct ALSA {
-  elem:  Arc<Mutex<MixerElem<'static, 'static>>>,
+  mixer: Arc<Mutex<Mixer<'static>>>,
+  elem:  MixerElemID<'static>,
   color: Color,
 }
 
@@ -248,9 +249,16 @@ struct MixerElem<'mixer, 'control> {
   ptr:      *mut alsa::snd_mixer_elem_t,
   _phantom: std::marker::PhantomData<&'mixer Mixer<'control>>,
 }
+#[derive(Clone)]
+struct MixerElemID<'control> {
+  ptr:      *mut alsa::snd_mixer_selem_id_t,
+  _phantom: std::marker::PhantomData<&'control Control>,
+}
 
 unsafe impl Send for Mixer<'_> {}
 unsafe impl Send for MixerElem<'_, '_> {}
+unsafe impl Send for MixerElemID<'_> {}
+unsafe impl Sync for MixerElemID<'_> {}
 
 impl<'control> Mixer<'control> {
   pub fn new(control: &'control Control) -> Result<Self> {
@@ -281,9 +289,24 @@ impl<'control> Mixer<'control> {
       Ok(elems)
     }
   }
+
+  pub fn get<'mixer>(
+    &'mixer self,
+    id: &MixerElemID<'control>,
+  ) -> Option<MixerElem<'mixer, 'control>> {
+    unsafe {
+      let elem = alsa::snd_mixer_find_selem(self.ptr, id.ptr);
+      if elem.is_null() {
+        None
+      } else {
+        Some(MixerElem { ptr: elem, _phantom: Default::default() })
+      }
+    }
+  }
 }
 
 #[repr(i32)]
+#[allow(unused)]
 enum Channel {
   Unknown   = -1,
   FrontLeft = 0,
@@ -297,7 +320,7 @@ enum Channel {
   RearCenter,
 }
 
-impl MixerElem<'_, '_> {
+impl<'control> MixerElem<'_, 'control> {
   pub fn name(&self) -> String {
     unsafe {
       let ptr = alsa::snd_mixer_selem_get_name(self.ptr);
@@ -307,7 +330,17 @@ impl MixerElem<'_, '_> {
       CStr::from_ptr(ptr).to_str().unwrap().to_string()
     }
   }
+  pub fn id(&self) -> Result<MixerElemID<'control>> {
+    unsafe {
+      let mut id: *mut alsa::snd_mixer_selem_id_t = std::ptr::null_mut();
+      check!(alsa::snd_mixer_selem_id_malloc(&mut id))?;
+      alsa::snd_mixer_selem_get_id(self.ptr, id);
 
+      Ok(MixerElemID { ptr: id, _phantom: Default::default() })
+    }
+  }
+
+  #[allow(unused)]
   pub fn has_playback_channel(&self, channel: Channel) -> bool {
     unsafe { alsa::snd_mixer_selem_has_playback_channel(self.ptr, channel as i32) != 0 }
   }
@@ -345,23 +378,26 @@ impl ALSA {
   fn new_inner() -> Result<Self> {
     let control = Box::leak(Box::new(Control::new_name("Generic")?));
 
-    let mixer = Box::leak(Box::new(Mixer::new(control)?));
+    let mixer = Mixer::new(control)?;
     let mut elem = None;
     for e in mixer.elems()? {
       if e.name() == "Master" {
-        elem = Some(e);
+        elem = Some(e.id()?);
         break;
       }
     }
 
     Ok(ALSA {
-      elem:  Arc::new(Mutex::new(elem.expect("could not find control"))),
+      mixer: Arc::new(Mutex::new(mixer)),
+      elem:  elem.expect("could not find control"),
       color: Color { r: 100, g: 255, b: 128 },
     })
   }
 
   pub fn volume(&self) -> f64 {
-    self.elem.lock().playback_volume(Channel::FrontLeft).unwrap() as f64
+    let lock = self.mixer.lock();
+    let elem = lock.get(&self.elem).unwrap();
+    elem.playback_volume(Channel::FrontLeft).unwrap() as f64
   }
 }
 
