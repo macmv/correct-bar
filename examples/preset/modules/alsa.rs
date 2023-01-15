@@ -2,12 +2,12 @@
 
 use alsa_sys as alsa;
 use correct_bar::bar::{Color, ModuleImpl, Updater};
+use crossbeam_channel::Receiver;
 use parking_lot::Mutex;
 use std::{
   ffi::{CStr, CString},
   fmt,
   sync::Arc,
-  time::Duration,
 };
 
 #[derive(Clone)]
@@ -15,6 +15,7 @@ pub struct ALSA {
   control: Arc<Mutex<Control>>,
   elem:    MixerElemID,
   color:   Color,
+  recv:    Receiver<()>,
 }
 
 macro_rules! check {
@@ -239,12 +240,15 @@ impl ALSA {
   fn new_inner() -> Result<Self> {
     let control = Control::new_name("Generic")?;
 
+    let (tx, rx) = crossbeam_channel::bounded(16);
     let elem = {
       let mixer = Mixer::new(&control)?;
       let mut elem = None;
       for e in mixer.elems()? {
         if e.name() == "Master" {
-          e.set_callback(|| println!("sup"));
+          e.set_callback(move || {
+            tx.send(()).unwrap();
+          });
           elem = Some(e.id()?);
           break;
         }
@@ -259,6 +263,7 @@ impl ALSA {
       control: Arc::new(Mutex::new(control)),
       elem:    elem.expect("could not find control"),
       color:   Color { r: 100, g: 255, b: 128 },
+      recv:    rx,
     })
   }
 
@@ -266,16 +271,16 @@ impl ALSA {
     let control = self.control.lock();
     let mixer = Mixer::new(&control).unwrap();
     let elem = mixer.get(&self.elem).unwrap();
-    elem.playback_volume(Channel::FrontLeft).unwrap() as f64
+    elem.playback_volume(Channel::FrontLeft).unwrap() as f64 / 87.0
   }
 }
 
 impl ModuleImpl for ALSA {
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     // foo
-    ctx.draw_text(&format!("{}", self.volume() * 100.0), self.color);
+    ctx.draw_text(&format!("{}", (self.volume() * 100.0).round()), self.color);
     ctx.draw_text("%", self.color);
   }
-  fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
+  fn updater(&self) -> Updater { Updater::Channel(self.recv.clone()) }
   fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }
 }
