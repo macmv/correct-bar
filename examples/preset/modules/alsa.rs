@@ -103,7 +103,7 @@ unsafe impl Send for MixerElemID {}
 unsafe impl Sync for MixerElemID {}
 
 impl<'control> Mixer<'control> {
-  pub fn new(control: &'control Control) -> Result<Self> {
+  pub fn new(control: &Control) -> Result<Self> {
     unsafe {
       let mut mixer: *mut alsa::snd_mixer_t = std::ptr::null_mut();
       check!(alsa::snd_mixer_open(&mut mixer, 1))?;
@@ -140,6 +140,12 @@ impl<'control> Mixer<'control> {
       } else {
         Some(MixerElem { ptr: elem, _phantom: Default::default() })
       }
+    }
+  }
+
+  pub fn handle_callbacks(&self) {
+    unsafe {
+      alsa::snd_mixer_handle_events(self.ptr);
     }
   }
 }
@@ -195,6 +201,22 @@ impl<'control> MixerElem<'_, 'control> {
       }
     }
   }
+
+  // Don't call this twice lol.
+  pub fn set_callback(&self, custom: impl Fn() + Send + 'static) {
+    static CALLBACK: Mutex<Option<Box<dyn Fn() + Send>>> = Mutex::new(None);
+    unsafe extern "C" fn callback(_elem: *mut alsa::snd_mixer_elem_t, _mask: u32) -> i32 {
+      let cb = CALLBACK.lock();
+      if let Some(cb) = &*cb {
+        cb();
+      }
+      0
+    }
+    unsafe {
+      alsa::snd_mixer_elem_set_callback(self.ptr, Some(callback));
+    }
+    *CALLBACK.lock() = Some(Box::new(custom));
+  }
 }
 
 impl fmt::Debug for MixerElem<'_, '_> {
@@ -222,10 +244,14 @@ impl ALSA {
       let mut elem = None;
       for e in mixer.elems()? {
         if e.name() == "Master" {
+          e.set_callback(|| println!("sup"));
           elem = Some(e.id()?);
           break;
         }
       }
+      std::thread::spawn(move || loop {
+        mixer.handle_callbacks();
+      });
       elem
     };
 
