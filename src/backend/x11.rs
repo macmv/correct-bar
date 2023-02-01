@@ -114,7 +114,7 @@ pub fn setup(config: Config) -> Vec<Arc<Mutex<Bar>>> {
   match setup_inner(config) {
     Ok(bar) => bar,
     Err(e) => {
-      println!("{e}");
+      println!("error: {e}");
       std::process::exit(1);
     }
   }
@@ -139,7 +139,11 @@ fn root_windows(conn: &xcb::Connection, screen: &xcb::x::Screen) -> xcb::Result<
     }
   }
 
-  Ok(roots)
+  if roots.is_empty() {
+    Ok(vec![screen.root()])
+  } else {
+    Ok(roots)
+  }
 }
 
 fn setup_window(
@@ -173,13 +177,20 @@ fn setup_window(
     ],
   }))?;
 
-  conn.check_request(conn.send_request_checked(&x::ConfigureWindow {
-    window,
-    value_list: &[
-      x::ConfigWindow::Sibling(root_window),
-      x::ConfigWindow::StackMode(x::StackMode::Above),
-    ],
-  }))?;
+  if root_window == screen.root() {
+    conn.check_request(conn.send_request_checked(&x::ConfigureWindow {
+      window,
+      value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
+    }))?;
+  } else {
+    conn.check_request(conn.send_request_checked(&x::ConfigureWindow {
+      window,
+      value_list: &[
+        x::ConfigWindow::Sibling(root_window),
+        x::ConfigWindow::StackMode(x::StackMode::Above),
+      ],
+    }))?;
+  }
 
   conn.check_request(conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Replace,
