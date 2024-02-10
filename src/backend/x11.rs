@@ -165,14 +165,23 @@ struct WindowBuilder<'a> {
   root:   x::Window,
   geom:   x::GetGeometryReply,
   config: Config,
+
+  requests: Vec<xcb::VoidCookieChecked>,
 }
 
 impl WindowBuilder<'_> {
-  fn check_send(&self, req: &impl xcb::RequestWithoutReply) -> Result<(), xcb::ProtocolError> {
-    self.conn.check_request(self.conn.send_request_checked(req))
+  fn check_send(&mut self, req: &impl xcb::RequestWithoutReply) {
+    self.requests.push(self.conn.send_request_checked(req));
   }
 
-  fn create_window(&self) -> xcb::Result<x::Window> {
+  fn flush(&mut self) -> xcb::Result<()> {
+    for req in self.requests.drain(..) {
+      self.conn.check_request(req)?;
+    }
+    Ok(())
+  }
+
+  fn create_window(&mut self) -> xcb::Result<x::Window> {
     let window = self.conn.generate_id();
 
     self.check_send(&x::CreateWindow {
@@ -193,13 +202,13 @@ impl WindowBuilder<'_> {
           x::EventMask::EXPOSURE | x::EventMask::BUTTON_PRESS | x::EventMask::POINTER_MOTION,
         ),
       ],
-    })?;
+    });
 
     if self.root == self.screen.root() {
       self.check_send(&x::ConfigureWindow {
         window,
         value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
-      })?;
+      });
     } else {
       self.check_send(&x::ConfigureWindow {
         window,
@@ -207,27 +216,25 @@ impl WindowBuilder<'_> {
           x::ConfigWindow::Sibling(self.root),
           x::ConfigWindow::StackMode(x::StackMode::Above),
         ],
-      })?;
+      });
     }
 
-    self.add_properties(window)?;
+    self.add_properties(window);
 
     self.conn.send_request(&x::MapWindow { window });
-    self.conn.flush()?;
+    self.flush()?;
 
     Ok(window)
   }
 
-  fn add_properties(&self, window: x::Window) -> xcb::Result<()> {
-    // TODO: It might be nice to send all these at once, and check after. Ah well.
-
+  fn add_properties(&mut self, window: x::Window) {
     self.check_send(&x::ChangeProperty {
       mode: x::PropMode::Replace,
       window,
       property: x::ATOM_WM_NAME,
       r#type: x::ATOM_STRING,
       data: b"Correct Bar",
-    })?;
+    });
 
     // Need to send these requests before mapping the window!
 
@@ -237,7 +244,7 @@ impl WindowBuilder<'_> {
       property: self.atoms.wm_window_type,
       r#type: x::ATOM_ATOM,
       data: &[self.atoms.wm_window_type_dock],
-    })?;
+    });
 
     self.check_send(&x::ChangeProperty {
       mode: x::PropMode::Append,
@@ -245,7 +252,7 @@ impl WindowBuilder<'_> {
       property: self.atoms.wm_state,
       r#type: x::ATOM_ATOM,
       data: &[self.atoms.wm_state_above, self.atoms.wm_state_sticky],
-    })?;
+    });
 
     let mut strut = [0_u32; 12];
     strut[Strut::Top as usize] =
@@ -259,7 +266,7 @@ impl WindowBuilder<'_> {
       property: self.atoms.wm_strut,
       r#type: x::ATOM_CARDINAL,
       data: &strut[..4],
-    })?;
+    });
 
     self.check_send(&x::ChangeProperty {
       mode: x::PropMode::Replace,
@@ -267,12 +274,10 @@ impl WindowBuilder<'_> {
       property: self.atoms.wm_strut_partial,
       r#type: x::ATOM_CARDINAL,
       data: &strut,
-    })?;
-
-    Ok(())
+    });
   }
 
-  fn build(self, window: x::Window) -> xcb::Result<Bar> {
+  fn build(mut self, window: x::Window) -> xcb::Result<Bar> {
     let depth = self.screen.root_depth();
 
     let pixmap = self.conn.generate_id();
@@ -282,14 +287,16 @@ impl WindowBuilder<'_> {
       height: self.config.window.height as u16,
       width: self.geom.width(),
       depth,
-    })?;
+    });
 
     let gc = self.conn.generate_id();
     self.check_send(&x::CreateGc {
       drawable:   x::Drawable::Pixmap(pixmap),
       cid:        gc,
       value_list: &[],
-    })?;
+    });
+
+    self.flush()?;
 
     assert_eq!(depth, 24);
 
@@ -333,7 +340,8 @@ fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
     let mut config = config.clone();
     config.apply_scaling_for_width(geom.width().into());
 
-    let builder = WindowBuilder { conn: &conn, atoms: &atoms, screen, root, geom, config };
+    let mut builder =
+      WindowBuilder { conn: &conn, atoms: &atoms, screen, root, geom, config, requests: vec![] };
 
     let window = builder.create_window()?;
     let bar = builder.build(window)?;
