@@ -28,6 +28,12 @@ pub struct Modules {
   right:  Vec<PositionedModule>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Cursor {
+  Normal,
+  Hand,
+}
+
 #[derive(Debug)]
 struct PositionedModule {
   module: Module,
@@ -142,6 +148,16 @@ impl Bar {
         return;
       }
     }
+  }
+
+  pub fn mouse_move(&mut self, x: u32, y: u32) -> Cursor {
+    self.update_stale_positions();
+    for module in self.modules() {
+      if x >= module.pos && x <= module.pos + module.buffer.width() {
+        return Cursor::Hand;
+      }
+    }
+    Cursor::Normal
   }
 
   pub fn all_modules(&self) -> impl Iterator<Item = (ModuleKey, &Module)> { self.modules.iter() }

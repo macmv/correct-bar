@@ -1,10 +1,11 @@
 use crate::{
-  bar::{Backend, Bar, Window},
+  bar::{Backend, Bar, Cursor, Window},
   config::Config,
 };
 use parking_lot::Mutex;
 use std::{collections::HashMap, sync::Arc, thread};
 use xcb::{x, Xid};
+use xcb_util_cursor::{Cursor as XCursor, CursorContext};
 
 macro_rules! atoms {
   (
@@ -146,6 +147,17 @@ fn root_windows(conn: &xcb::Connection, screen: &xcb::x::Screen) -> xcb::Result<
   }
 }
 
+struct BarWindow {
+  bar:    Arc<Mutex<Bar>>,
+  window: x::Window,
+  cursor: Cursor,
+}
+impl BarWindow {
+  fn new(bar: Arc<Mutex<Bar>>, window: x::Window) -> Self {
+    BarWindow { bar, window, cursor: Cursor::Normal }
+  }
+}
+
 fn setup_window(
   atoms: &Atoms,
   conn: &Arc<xcb::Connection>,
@@ -173,7 +185,9 @@ fn setup_window(
     // this list must be in same order than `Cw` enum order
     value_list:   &[
       x::Cw::BackPixel(0x222222),
-      x::Cw::EventMask(x::EventMask::EXPOSURE | x::EventMask::BUTTON_PRESS),
+      x::Cw::EventMask(
+        x::EventMask::EXPOSURE | x::EventMask::BUTTON_PRESS | x::EventMask::POINTER_MOTION,
+      ),
     ],
   }))?;
 
@@ -287,12 +301,17 @@ fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
   let setup = conn.get_setup();
   let screen = setup.roots().nth(screen_num as usize).unwrap().clone();
 
+  let cursor_context = CursorContext::new(&conn, screen).unwrap();
+
+  let normal_cursor = cursor_context.load_cursor(XCursor::LeftPtr);
+  let hand_cursor = cursor_context.load_cursor(XCursor::Hand1);
+
   let atoms = Atoms::setup(&conn)?;
 
   // We setup a bar for every root. Sometimes we get a fake geom here, which isn't
   // really a monitor, so we make sure it's real by checking that it's X/Y > 0.
   let mut bars = vec![];
-  let mut bars_map = HashMap::new();
+  let mut windows = HashMap::new();
   for root in root_windows(&conn, screen)? {
     let geom = conn
       .wait_for_reply(conn.send_request(&x::GetGeometry { drawable: x::Drawable::Window(root) }))?;
@@ -307,7 +326,7 @@ fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
       setup_window(&atoms, &conn, config, screen, root, geom.x(), geom.y(), geom.width())?;
     let bar = Arc::new(Mutex::new(bar));
 
-    bars_map.insert(window.resource_id(), bar.clone());
+    windows.insert(window.resource_id(), BarWindow::new(bar.clone(), window));
     bars.push(bar);
   }
 
@@ -316,12 +335,34 @@ fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
     loop {
       match conn.wait_for_event().unwrap() {
         xcb::Event::X(x::Event::Expose(ev)) => {
-          let bar = &bars_map[&ev.window().resource_id()];
-          bar.lock().render()
+          let window = &windows[&ev.window().resource_id()];
+          window.bar.lock().render()
         }
         xcb::Event::X(x::Event::ButtonPress(ev)) => {
-          let bar = &bars_map[&ev.event().resource_id()];
-          bar.lock().click(ev.event_x().try_into().unwrap(), ev.event_y().try_into().unwrap())
+          let window = &windows[&ev.event().resource_id()];
+          let x = ev.event_x().try_into().unwrap();
+          let y = ev.event_y().try_into().unwrap();
+          window.bar.lock().click(x, y);
+        }
+        xcb::Event::X(x::Event::MotionNotify(ev)) => {
+          let window = windows.get_mut(&ev.event().resource_id()).unwrap();
+          let x = ev.event_x().try_into().unwrap();
+          let y = ev.event_y().try_into().unwrap();
+          let cursor = window.bar.lock().mouse_move(x, y);
+
+          if cursor != window.cursor {
+            window.cursor = cursor;
+
+            let x_cursor = match cursor {
+              Cursor::Normal => normal_cursor,
+              Cursor::Hand => hand_cursor,
+            };
+            conn.send_request(&x::ChangeWindowAttributes {
+              window:     window.window,
+              value_list: &[(x::Cw::Cursor(x_cursor))],
+            });
+            conn.flush().unwrap();
+          }
         }
         xcb::Event::X(x::Event::ClientMessage(ev)) => {
           // We have received a message from the server
