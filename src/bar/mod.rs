@@ -78,6 +78,15 @@ impl PositionedModule {
       }
     }
   }
+  pub fn on_hover(&self, pos: Pos) -> Cursor {
+    let module_pos = Pos { x: pos.x - self.pos as i32, y: pos.y };
+    for region in &self.click_regions {
+      if module_pos.within(region.region) {
+        return Cursor::Hand;
+      }
+    }
+    Cursor::Normal
+  }
 }
 
 pub trait Backend {
@@ -154,7 +163,7 @@ impl Bar {
     self.update_stale_positions();
     for module in self.modules() {
       if x >= module.pos && x <= module.pos + module.buffer.width() {
-        return Cursor::Hand;
+        return module.on_hover(Pos { x: x as i32, y: y as i32 });
       }
     }
     Cursor::Normal
