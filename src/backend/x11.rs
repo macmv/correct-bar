@@ -135,7 +135,7 @@ fn root_windows(conn: &xcb::Connection, screen: &xcb::x::Screen) -> xcb::Result<
       long_length: 4,
     }))?;
     let classes = std::str::from_utf8(atom.value()).unwrap();
-    if classes.split("\0").any(|class| class == "Bspwm") {
+    if classes.split('\0').any(|class| class == "Bspwm") {
       roots.push(*child);
     }
   }
@@ -172,18 +172,18 @@ fn setup_window(
   let depth = screen.root_depth();
 
   conn.check_request(conn.send_request_checked(&x::CreateWindow {
-    depth:        x::COPY_FROM_PARENT as u8,
-    wid:          window,
-    parent:       screen.root(),
-    x:            x + config.window.margin_left as i16,
-    y:            y + config.window.margin_top as i16,
-    width:        width as u16,
-    height:       config.window.height as u16,
+    depth: x::COPY_FROM_PARENT as u8,
+    wid: window,
+    parent: screen.root(),
+    x: x + config.window.margin_left as i16,
+    y: y + config.window.margin_top as i16,
+    width,
+    height: config.window.height as u16,
     border_width: 0,
-    class:        x::WindowClass::InputOutput,
-    visual:       screen.root_visual(),
+    class: x::WindowClass::InputOutput,
+    visual: screen.root_visual(),
     // this list must be in same order than `Cw` enum order
-    value_list:   &[
+    value_list: &[
       x::Cw::BackPixel(0x222222),
       x::Cw::EventMask(
         x::EventMask::EXPOSURE | x::EventMask::BUTTON_PRESS | x::EventMask::POINTER_MOTION,
@@ -268,7 +268,7 @@ fn setup_window(
     drawable: x::Drawable::Window(window),
     pid: pixmap,
     height: config.window.height as u16,
-    width: width as u16,
+    width,
     depth,
   }))?;
 
@@ -299,7 +299,7 @@ fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
   let conn = Arc::new(conn);
 
   let setup = conn.get_setup();
-  let screen = setup.roots().nth(screen_num as usize).unwrap().clone();
+  let screen = setup.roots().nth(screen_num as usize).unwrap();
 
   let cursor_context = CursorContext::new(&conn, screen).unwrap();
 

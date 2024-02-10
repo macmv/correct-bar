@@ -53,7 +53,7 @@ impl BSPWM {
       let mut line = String::new();
       loop {
         socket.read_line(&mut line).unwrap();
-        let mut sections = line.trim().split(" ");
+        let mut sections = line.trim().split(' ');
         match sections.next() {
           Some("desktop_focus") => {
             let monitor = parse_hex(sections.next().unwrap());

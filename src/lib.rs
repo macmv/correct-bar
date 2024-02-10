@@ -55,7 +55,7 @@ pub fn run(config: Config) {
         sel.recv(chan);
       });
       let idx = sel.ready();
-      while let Ok(_) = channel_modules[idx].1.try_recv() {}
+      while channel_modules[idx].1.try_recv().is_ok() {}
       for bar in &bars {
         let mut b = bar.lock();
         b.update_module(channel_modules[idx].0);

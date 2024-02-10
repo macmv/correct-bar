@@ -66,7 +66,7 @@ impl FontCache {
   pub fn render(&mut self, glyph: &ScaledGlyph) -> &AlphaBuffer {
     // In order for anti-aliasing to work correctly, we add 1 pixel of extra space
     // around the bounding box.
-    if !self.glyphs.contains_key(&glyph.id()) {
+    self.glyphs.entry(glyph.id()).or_insert_with(|| {
       let bounds = glyph.exact_bounding_box().unwrap();
       let mut buf =
         AlphaBuffer::new(bounds.width().ceil() as u32 + 2, bounds.height().ceil() as u32 + 2);
@@ -75,8 +75,8 @@ impl FontCache {
           buf.draw_pixel(Pos { x: x as i32 + 1, y: y as i32 + 1 }, (coverage * 255.0) as u8);
         }
       });
-      self.glyphs.insert(glyph.id(), buf);
-    }
+      buf
+    });
     self.glyphs.get(&glyph.id()).unwrap()
   }
 }

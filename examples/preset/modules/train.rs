@@ -11,9 +11,7 @@ pub struct Train {
 }
 
 impl Clone for Train {
-  fn clone(&self) -> Self {
-    Train { primary: self.primary, pos: Mutex::new(self.pos.lock().clone()) }
-  }
+  fn clone(&self) -> Self { Train { primary: self.primary, pos: Mutex::new(*self.pos.lock()) } }
 }
 
 impl ModuleImpl for Train {

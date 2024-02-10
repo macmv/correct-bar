@@ -108,7 +108,7 @@ impl Meminfo {
       .lines()
       .flat_map(|line| {
         let l = line.unwrap();
-        let mut sections = l.split(":");
+        let mut sections = l.split(':');
         let key = sections.next().unwrap();
         let value = sections.next().unwrap().trim();
         value.strip_suffix(" kB").map(|val| (key.to_string(), val.parse::<u64>().unwrap()))
@@ -146,7 +146,7 @@ impl Stat {
 
 impl CpuStat {
   fn parse_from(s: &str) -> Self {
-    let mut sections = s.split(" ");
+    let mut sections = s.split(' ');
     // This is the cpu/cpu0/cpu1 section
     let first = sections.next().unwrap();
     // The `cpu` line has a double space.
@@ -259,10 +259,9 @@ impl ModuleImpl for Mem {
       sys.refresh();
       let state = sys.state();
 
-      ctx.draw_text(&format!("{:>5.02}G", state.memory.used_mb as f64 / 1024 as f64), self.primary);
+      ctx.draw_text(&format!("{:>5.02}G", state.memory.used_mb as f64 / 1024_f64), self.primary);
       ctx.draw_text(" / ", self.secondary);
-      ctx
-        .draw_text(&format!("{:>5.02}G", state.memory.total_mb as f64 / 1024 as f64), self.primary);
+      ctx.draw_text(&format!("{:>5.02}G", state.memory.total_mb as f64 / 1024_f64), self.primary);
     });
   }
   fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }

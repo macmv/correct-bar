@@ -1,7 +1,7 @@
 mod preset;
 
 fn main() {
-  match std::env::args().nth(1).as_ref().map(|s| s.as_str()) {
+  match std::env::args().nth(1).as_deref() {
     Some("desktop") => preset::desktop::run(),
     Some("laptop") => preset::laptop::run(),
     Some(preset) => eprintln!("invalid preset `{preset}`"),

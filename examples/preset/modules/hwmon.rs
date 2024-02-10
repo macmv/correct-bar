@@ -96,7 +96,7 @@ impl ModuleImpl for Temp {
       }
       let m = monitors.as_mut().unwrap();
 
-      if let Some(mon) = m.iter_mut().filter(|m| m.name == "k10temp").next() {
+      if let Some(mon) = m.iter_mut().find(|m| m.name == "k10temp") {
         let results = mon.read();
         ctx.draw_text(&format!("{:>2.00}", results[0].1), self.primary);
         ctx.draw_text("°", self.secondary);
