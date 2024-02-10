@@ -2,6 +2,7 @@ use correct_bar::bar::{Color, ModuleImpl, Updater};
 use crossbeam_channel::Receiver;
 use parking_lot::Mutex;
 use std::{
+  io,
   io::{prelude::*, BufReader},
   os::unix::net::UnixStream,
   sync::Arc,
@@ -18,8 +19,29 @@ pub struct BSPWM {
 fn parse_hex(s: &str) -> u32 { u32::from_str_radix(&s[2..], 16).unwrap() }
 
 impl BSPWM {
-  pub fn new() -> Self { BSPWM::new_at("/tmp/bspwm_0_0-socket") }
-  pub fn new_at(path: &str) -> Self {
+  pub fn new() -> Self {
+    // As per the BSPC docs:
+    // /tmp/bspwm<host_name>_<display_number>_<screen_number>-socket
+
+    let host_name = "";
+    let screen_number = 0;
+
+    // I'm too lazy to change my init structure, so I'll just try the first couple
+    // displays.
+    for display_number in 0..5 {
+      match BSPWM::new_at(&format!("/tmp/bspwm{host_name}_{display_number}_{screen_number}-socket"))
+      {
+        Ok(v) => return v,
+        Err(_) => continue,
+      }
+    }
+
+    panic!("could not find bspwm socket");
+  }
+  pub fn new_at(path: &str) -> Result<Self, ()> {
+    // Check if the path is valid.
+    open_socket(path).map_err(|_| ())?;
+
     let state = send_immediate_json::<json::WmState>(path, &["wm", "-d"]).unwrap();
     let state = Arc::new(Mutex::new(state));
 
@@ -46,13 +68,14 @@ impl BSPWM {
         line.clear();
       }
     });
-    BSPWM { path: path.into(), channel: rx, state }
+
+    Ok(BSPWM { path: path.into(), channel: rx, state })
   }
 }
 
-fn open_socket(path: &str) -> UnixStream { UnixStream::connect(path).unwrap() }
+fn open_socket(path: &str) -> io::Result<UnixStream> { UnixStream::connect(path) }
 fn send_blocking(path: &str, args: &[&str]) -> UnixStream {
-  let mut socket = open_socket(path);
+  let mut socket = open_socket(path).unwrap();
   for arg in args {
     socket.write(arg.as_bytes()).unwrap();
     socket.write(&[0x00]).unwrap();
