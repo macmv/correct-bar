@@ -158,6 +158,58 @@ impl BarWindow {
   }
 }
 
+struct WindowBuilder<'a> {
+  conn:   &'a xcb::Connection,
+  screen: &'a x::Screen,
+  root:   x::Window,
+  geom:   x::GetGeometryReply,
+  config: Config,
+}
+
+impl WindowBuilder<'_> {
+  fn create_window(&self) -> xcb::Result<x::Window> {
+    let window = self.conn.generate_id();
+    let depth = self.screen.root_depth();
+
+    self.conn.check_request(self.conn.send_request_checked(&x::CreateWindow {
+      depth:        x::COPY_FROM_PARENT as u8,
+      wid:          window,
+      parent:       self.screen.root(),
+      x:            self.geom.x() + self.config.window.margin_left as i16,
+      y:            self.geom.y() + self.config.window.margin_top as i16,
+      width:        self.geom.width(),
+      height:       self.config.window.height as u16,
+      border_width: 0,
+      class:        x::WindowClass::InputOutput,
+      visual:       self.screen.root_visual(),
+      // this list must be in same order than `Cw` enum order
+      value_list:   &[
+        x::Cw::BackPixel(0x222222),
+        x::Cw::EventMask(
+          x::EventMask::EXPOSURE | x::EventMask::BUTTON_PRESS | x::EventMask::POINTER_MOTION,
+        ),
+      ],
+    }))?;
+
+    if self.root == self.screen.root() {
+      self.conn.check_request(self.conn.send_request_checked(&x::ConfigureWindow {
+        window,
+        value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
+      }))?;
+    } else {
+      self.conn.check_request(self.conn.send_request_checked(&x::ConfigureWindow {
+        window,
+        value_list: &[
+          x::ConfigWindow::Sibling(self.root),
+          x::ConfigWindow::StackMode(x::StackMode::Above),
+        ],
+      }))?;
+    }
+
+    Ok(window)
+  }
+}
+
 fn setup_window(
   atoms: &Atoms,
   conn: &Arc<xcb::Connection>,
@@ -168,44 +220,7 @@ fn setup_window(
   y: i16,
   width: u16,
 ) -> xcb::Result<(x::Window, Bar)> {
-  let window = conn.generate_id();
-  let depth = screen.root_depth();
-
-  conn.check_request(conn.send_request_checked(&x::CreateWindow {
-    depth: x::COPY_FROM_PARENT as u8,
-    wid: window,
-    parent: screen.root(),
-    x: x + config.window.margin_left as i16,
-    y: y + config.window.margin_top as i16,
-    width,
-    height: config.window.height as u16,
-    border_width: 0,
-    class: x::WindowClass::InputOutput,
-    visual: screen.root_visual(),
-    // this list must be in same order than `Cw` enum order
-    value_list: &[
-      x::Cw::BackPixel(0x222222),
-      x::Cw::EventMask(
-        x::EventMask::EXPOSURE | x::EventMask::BUTTON_PRESS | x::EventMask::POINTER_MOTION,
-      ),
-    ],
-  }))?;
-
-  if root_window == screen.root() {
-    conn.check_request(conn.send_request_checked(&x::ConfigureWindow {
-      window,
-      value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
-    }))?;
-  } else {
-    conn.check_request(conn.send_request_checked(&x::ConfigureWindow {
-      window,
-      value_list: &[
-        x::ConfigWindow::Sibling(root_window),
-        x::ConfigWindow::StackMode(x::StackMode::Above),
-      ],
-    }))?;
-  }
-
+  /*
   conn.check_request(conn.send_request_checked(&x::ChangeProperty {
     mode: x::PropMode::Replace,
     window,
@@ -291,6 +306,8 @@ fn setup_window(
       X11Backend { conn: conn.clone(), window, pixmap, depth, gc },
     ),
   ))
+  */
+  todo!()
 }
 
 fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
@@ -322,9 +339,17 @@ fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
 
     let mut config = config.clone();
     config.apply_scaling_for_width(geom.width().into());
+
+    let builder = WindowBuilder { conn: &conn, screen, root, geom, config };
+
+    let window = builder.create_window()?;
+    let bar: Arc<Mutex<Bar>> = todo!();
+
+    /*
     let (window, bar) =
       setup_window(&atoms, &conn, config, screen, root, geom.x(), geom.y(), geom.width())?;
     let bar = Arc::new(Mutex::new(bar));
+    */
 
     windows.insert(window.resource_id(), BarWindow::new(bar.clone(), window));
     bars.push(bar);
