@@ -291,17 +291,8 @@ impl Buffer {
     fn lerp(a: Pos, b: Pos, fac: f64) -> Pos { (b - a) * fac + a }
 
     for y in top..bot {
-      let (min_x, max_x) = if y < middle.y {
-        (
-          lerp(middle, left, y as f64 / left.y as f64).x,
-          lerp(middle, right, y as f64 / left.y as f64).x,
-        )
-      } else {
-        (
-          lerp(middle, left, y as f64 / left.y as f64).x,
-          lerp(middle, right, y as f64 / left.y as f64).x,
-        )
-      };
+      let min_x = lerp(middle, left, y as f64 / left.y as f64).x;
+      let max_x = lerp(middle, right, y as f64 / left.y as f64).x;
       for x in min_x..max_x {
         self.draw_pixel(Pos { x, y }, color);
       }
