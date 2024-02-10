@@ -159,7 +159,8 @@ impl BarWindow {
 }
 
 struct WindowBuilder<'a> {
-  conn:   &'a xcb::Connection,
+  conn:   &'a Arc<xcb::Connection>,
+  atoms:  &'a Atoms,
   screen: &'a x::Screen,
   root:   x::Window,
   geom:   x::GetGeometryReply,
@@ -167,11 +168,14 @@ struct WindowBuilder<'a> {
 }
 
 impl WindowBuilder<'_> {
+  fn check_send(&self, req: &impl xcb::RequestWithoutReply) -> Result<(), xcb::ProtocolError> {
+    self.conn.check_request(self.conn.send_request_checked(req))
+  }
+
   fn create_window(&self) -> xcb::Result<x::Window> {
     let window = self.conn.generate_id();
-    let depth = self.screen.root_depth();
 
-    self.conn.check_request(self.conn.send_request_checked(&x::CreateWindow {
+    self.check_send(&x::CreateWindow {
       depth:        x::COPY_FROM_PARENT as u8,
       wid:          window,
       parent:       self.screen.root(),
@@ -189,125 +193,114 @@ impl WindowBuilder<'_> {
           x::EventMask::EXPOSURE | x::EventMask::BUTTON_PRESS | x::EventMask::POINTER_MOTION,
         ),
       ],
-    }))?;
+    })?;
 
     if self.root == self.screen.root() {
-      self.conn.check_request(self.conn.send_request_checked(&x::ConfigureWindow {
+      self.check_send(&x::ConfigureWindow {
         window,
         value_list: &[x::ConfigWindow::StackMode(x::StackMode::Above)],
-      }))?;
+      })?;
     } else {
-      self.conn.check_request(self.conn.send_request_checked(&x::ConfigureWindow {
+      self.check_send(&x::ConfigureWindow {
         window,
         value_list: &[
           x::ConfigWindow::Sibling(self.root),
           x::ConfigWindow::StackMode(x::StackMode::Above),
         ],
-      }))?;
+      })?;
     }
+
+    self.add_properties(window)?;
+
+    self.conn.send_request(&x::MapWindow { window });
+    self.conn.flush()?;
 
     Ok(window)
   }
-}
 
-fn setup_window(
-  atoms: &Atoms,
-  conn: &Arc<xcb::Connection>,
-  config: Config,
-  screen: &x::Screen,
-  root_window: x::Window,
-  x: i16,
-  y: i16,
-  width: u16,
-) -> xcb::Result<(x::Window, Bar)> {
-  /*
-  conn.check_request(conn.send_request_checked(&x::ChangeProperty {
-    mode: x::PropMode::Replace,
-    window,
-    property: x::ATOM_WM_NAME,
-    r#type: x::ATOM_STRING,
-    data: b"Correct Bar",
-  }))?;
+  fn add_properties(&self, window: x::Window) -> xcb::Result<()> {
+    // TODO: It might be nice to send all these at once, and check after. Ah well.
 
-  // Need to send these requests before mapping the window!
+    self.check_send(&x::ChangeProperty {
+      mode: x::PropMode::Replace,
+      window,
+      property: x::ATOM_WM_NAME,
+      r#type: x::ATOM_STRING,
+      data: b"Correct Bar",
+    })?;
 
-  conn.check_request(conn.send_request_checked(&x::ChangeProperty {
-    mode: x::PropMode::Replace,
-    window,
-    property: atoms.wm_window_type,
-    r#type: x::ATOM_ATOM,
-    data: &[atoms.wm_window_type_dock],
-  }))?;
+    // Need to send these requests before mapping the window!
 
-  let cookie = conn.send_request_checked(&x::ChangeProperty {
-    mode: x::PropMode::Append,
-    window,
-    property: atoms.wm_state,
-    r#type: x::ATOM_ATOM,
-    data: &[atoms.wm_state_above, atoms.wm_state_sticky],
-  });
-  conn.check_request(cookie)?;
+    self.check_send(&x::ChangeProperty {
+      mode: x::PropMode::Replace,
+      window,
+      property: self.atoms.wm_window_type,
+      r#type: x::ATOM_ATOM,
+      data: &[self.atoms.wm_window_type_dock],
+    })?;
 
-  let mut strut = [0_u32; 12];
-  strut[Strut::Top as usize] =
-    config.window.margin_top + config.window.height + config.window.margin_bottom;
-  strut[Strut::TopStartX as usize] = config.window.margin_left;
-  strut[Strut::TopEndX as usize] = width as u32 - config.window.margin_right;
+    self.check_send(&x::ChangeProperty {
+      mode: x::PropMode::Append,
+      window,
+      property: self.atoms.wm_state,
+      r#type: x::ATOM_ATOM,
+      data: &[self.atoms.wm_state_above, self.atoms.wm_state_sticky],
+    })?;
 
-  let cookie = conn.send_request_checked(&x::ChangeProperty {
-    mode: x::PropMode::Replace,
-    window,
-    property: atoms.wm_strut,
-    r#type: x::ATOM_CARDINAL,
-    data: &strut[..4],
-  });
-  conn.check_request(cookie)?;
+    let mut strut = [0_u32; 12];
+    strut[Strut::Top as usize] =
+      self.config.window.margin_top + self.config.window.height + self.config.window.margin_bottom;
+    strut[Strut::TopStartX as usize] = self.config.window.margin_left;
+    strut[Strut::TopEndX as usize] = self.geom.width() as u32 - self.config.window.margin_right;
 
-  let cookie = conn.send_request_checked(&x::ChangeProperty {
-    mode: x::PropMode::Replace,
-    window,
-    property: atoms.wm_strut_partial,
-    r#type: x::ATOM_CARDINAL,
-    data: &strut,
-  });
-  conn.check_request(cookie)?;
+    self.check_send(&x::ChangeProperty {
+      mode: x::PropMode::Replace,
+      window,
+      property: self.atoms.wm_strut,
+      r#type: x::ATOM_CARDINAL,
+      data: &strut[..4],
+    })?;
 
-  conn.send_request(&x::MapWindow { window });
+    self.check_send(&x::ChangeProperty {
+      mode: x::PropMode::Replace,
+      window,
+      property: self.atoms.wm_strut_partial,
+      r#type: x::ATOM_CARDINAL,
+      data: &strut,
+    })?;
 
-  // Previous request was checked, so a flush is not necessary in this case.
-  // Otherwise, here is how to perform a connection flush.
-  conn.flush()?;
+    Ok(())
+  }
 
-  let pixmap = conn.generate_id();
-  conn.check_request(conn.send_request_checked(&x::CreatePixmap {
-    drawable: x::Drawable::Window(window),
-    pid: pixmap,
-    height: config.window.height as u16,
-    width,
-    depth,
-  }))?;
+  fn build(self, window: x::Window) -> xcb::Result<Bar> {
+    let depth = self.screen.root_depth();
 
-  let gc = conn.generate_id();
-  conn.check_request(conn.send_request_checked(&x::CreateGc {
-    drawable:   x::Drawable::Pixmap(pixmap),
-    cid:        gc,
-    value_list: &[],
-  }))?;
+    let pixmap = self.conn.generate_id();
+    self.check_send(&x::CreatePixmap {
+      drawable: x::Drawable::Window(window),
+      pid: pixmap,
+      height: self.config.window.height as u16,
+      width: self.geom.width(),
+      depth,
+    })?;
 
-  assert_eq!(depth, 24);
+    let gc = self.conn.generate_id();
+    self.check_send(&x::CreateGc {
+      drawable:   x::Drawable::Pixmap(pixmap),
+      cid:        gc,
+      value_list: &[],
+    })?;
 
-  let height = config.window.height;
-  Ok((
-    window,
-    Bar::from_config(
-      config,
-      width.into(),
+    assert_eq!(depth, 24);
+
+    let height = self.config.window.height;
+    Ok(Bar::from_config(
+      self.config,
+      self.geom.width().into(),
       height,
-      X11Backend { conn: conn.clone(), window, pixmap, depth, gc },
-    ),
-  ))
-  */
-  todo!()
+      X11Backend { conn: self.conn.clone(), window, pixmap, depth, gc },
+    ))
+  }
 }
 
 fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
@@ -340,16 +333,12 @@ fn setup_inner(config: Config) -> xcb::Result<Vec<Arc<Mutex<Bar>>>> {
     let mut config = config.clone();
     config.apply_scaling_for_width(geom.width().into());
 
-    let builder = WindowBuilder { conn: &conn, screen, root, geom, config };
+    let builder = WindowBuilder { conn: &conn, atoms: &atoms, screen, root, geom, config };
 
     let window = builder.create_window()?;
-    let bar: Arc<Mutex<Bar>> = todo!();
+    let bar = builder.build(window)?;
 
-    /*
-    let (window, bar) =
-      setup_window(&atoms, &conn, config, screen, root, geom.x(), geom.y(), geom.width())?;
     let bar = Arc::new(Mutex::new(bar));
-    */
 
     windows.insert(window.resource_id(), BarWindow::new(bar.clone(), window));
     bars.push(bar);
