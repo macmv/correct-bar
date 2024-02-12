@@ -54,10 +54,32 @@ struct Control {
 unsafe impl Send for Control {}
 
 impl Control {
+  #[allow(unused)]
+  pub fn list_cards() {
+    let mut id = 0;
+
+    loop {
+      unsafe {
+        check!(alsa::snd_card_next(&mut id)).unwrap();
+        if id == -1 {
+          break;
+        }
+
+        let mut name = std::ptr::null_mut();
+        dbg!(id);
+        check!(alsa::snd_card_get_name(id, &mut name)).unwrap();
+        dbg!(CStr::from_ptr(name).to_str().unwrap());
+      }
+    }
+  }
+
+  #[allow(unused)]
   pub fn new_name(name: &str) -> Result<Self> {
     unsafe {
       let name = CString::new(name).unwrap();
+
       let id = check!(alsa::snd_card_get_index(name.as_ptr()))?;
+      dbg!(id);
 
       Self::new(id)
     }
@@ -283,7 +305,8 @@ impl ALSA {
   pub fn new() -> Self { Self::new_inner().unwrap() }
 
   fn new_inner() -> Result<Self> {
-    let control = Control::new_name("Generic")?;
+    // TODO: Remove this hardcoded ID
+    let control = Control::new(1)?;
 
     let (tx, rx) = crossbeam_channel::bounded(16);
     let elem = {
