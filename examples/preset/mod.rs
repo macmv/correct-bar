@@ -31,6 +31,8 @@ pub fn modules(include_bspwm: bool) -> (Vec<Module>, Vec<Module>, Vec<Module>) {
         modules::Train { primary: SEP, pos: 0.into() }.into(),
         SepModule.into(),
         modules::ALSA::new().into(),
+        SepModule.into(),
+        modules::Network { primary: Color::from_hex(0x8866ff), secondary: SEP }.into(),
       ]
     } else {
       vec![
@@ -38,6 +40,8 @@ pub fn modules(include_bspwm: bool) -> (Vec<Module>, Vec<Module>, Vec<Module>) {
         modules::Train { primary: SEP, pos: 0.into() }.into(),
         SepModule.into(),
         modules::ALSA::new().into(),
+        SepModule.into(),
+        modules::Network { primary: Color::from_hex(0x8866ff), secondary: SEP }.into(),
       ]
     },
     vec![
@@ -46,8 +50,6 @@ pub fn modules(include_bspwm: bool) -> (Vec<Module>, Vec<Module>, Vec<Module>) {
       Module::text("foo and stuff", Color { r: 100, g: 255, b: 128 }).into(),
     ],
     vec![
-      Module::text("mmm things", Color::from_hex(0x8866ff)).into(),
-      SepModule.into(),
       modules::Cpu { primary: Color::from_hex(0xff2200), secondary: SEP }.into(),
       SepModule.into(),
       modules::Temp { primary: Color::from_hex(0xff6600), secondary: SEP }.into(),
