@@ -114,14 +114,31 @@ impl NetworkState {
       let active =
         proxy.get::<dbus::Path>("org.freedesktop.NetworkManager.Device", "ActiveConnection")?;
 
-      let proxy = self.dbus.with_proxy("org.freedesktop.NetworkManager", &active, TIMEOUT);
-      // The path `active` won't exist if there is no active connection.
-      let Ok(id) = proxy.get::<String>("org.freedesktop.NetworkManager.Connection.Active", "Id")
+      let connection = self.dbus.with_proxy("org.freedesktop.NetworkManager", &active, TIMEOUT);
+
+      // The path `active` won't exist if there is no active connection, and this'll
+      // return an error.
+      let Ok(connection_id) =
+        connection.get::<String>("org.freedesktop.NetworkManager.Connection.Active", "Id")
       else {
         continue;
       };
 
-      connections.push(id);
+      let ty = proxy.get::<u32>("org.freedesktop.NetworkManager.Device", "DeviceType")?;
+      match ty {
+        // Ethernet
+        1 => {
+          // The interface name looks better than the connection ID for ethernet devices.
+          let id = proxy.get::<String>("org.freedesktop.NetworkManager.Device", "Interface")?;
+          connections.push(id);
+        }
+        // Wifi
+        2 => {
+          connections.push(connection_id);
+        }
+
+        _ => {}
+      }
     }
 
     Ok(connections)
