@@ -1,6 +1,10 @@
 use correct_bar::bar::{Color, ModuleImpl, Updater};
-use crossbeam_channel::Receiver;
-use dbus::blocking::{stdintf::org_freedesktop_dbus::Properties, Connection};
+use crossbeam_channel::{Receiver, Sender};
+use dbus::{
+  blocking::{stdintf::org_freedesktop_dbus::Properties, Connection},
+  channel::MatchingReceiver,
+  message::MatchRule,
+};
 use networkmanager::{
   devices::{Any, Wired},
   NetworkManager,
@@ -29,16 +33,21 @@ impl Network {
   }
 
   fn new_inner(primary: Color, secondary: Color) -> Result<Network> {
-    let state = NetworkState::new();
+    let state = NetworkState::new_system();
 
     let (tx, rx) = crossbeam_channel::bounded(0);
+
+    std::thread::spawn(move || {
+      let state = NetworkState::new_session();
+      state.subscribe_to_events(tx);
+    });
 
     Ok(Network { primary, secondary, recv: rx, state: Arc::new(Mutex::new(state)) })
   }
 }
 
 impl ModuleImpl for Network {
-  fn updater(&self) -> Updater { Updater::Never }
+  fn updater(&self) -> Updater { Updater::Channel(self.recv.clone()) }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
     let s = self.state.lock();
 
@@ -55,7 +64,37 @@ impl ModuleImpl for Network {
 const TIMEOUT: Duration = Duration::from_secs(5);
 
 impl NetworkState {
-  pub fn new() -> NetworkState { NetworkState { dbus: Connection::new_system().unwrap() } }
+  pub fn new_session() -> NetworkState { NetworkState { dbus: Connection::new_session().unwrap() } }
+  pub fn new_system() -> NetworkState { NetworkState { dbus: Connection::new_system().unwrap() } }
+
+  pub fn subscribe_to_events(&self, tx: Sender<()>) {
+    let mut rule = MatchRule::new();
+    rule.msg_type = Some(dbus::MessageType::Signal);
+    rule.path = Some("/org/freedesktop/portal/desktop".into());
+
+    let proxy = self.dbus.with_proxy("org.freedesktop.DBus", "/org/freedesktop/DBus", TIMEOUT);
+    let _: () = proxy
+      .method_call(
+        "org.freedesktop.DBus.Monitoring",
+        "BecomeMonitor",
+        (vec![rule.match_str()], 0u32),
+      )
+      .unwrap();
+
+    self.dbus.start_receive(
+      rule,
+      Box::new(move |msg, _| {
+        if msg.interface().as_deref() == Some("org.freedesktop.portal.NetworkMonitor") {
+          tx.send(()).unwrap();
+        }
+        true
+      }),
+    );
+
+    loop {
+      self.dbus.process(Duration::from_secs(1)).unwrap();
+    }
+  }
 
   pub fn active_connections(&self) -> Result<Vec<String>> {
     let proxy = self.dbus.with_proxy(
@@ -64,13 +103,10 @@ impl NetworkState {
       TIMEOUT,
     );
 
-    let devices = proxy
-      .method_call::<(Vec<dbus::Path>,), _, _, _>(
-        "org.freedesktop.NetworkManager",
-        "GetDevices",
-        (),
-      )?
-      .0;
+    let (devices,): (Vec<dbus::Path>,) =
+      proxy.method_call("org.freedesktop.NetworkManager", "GetDevices", ())?;
+
+    let mut connections = vec![];
 
     for dev in devices {
       let proxy = self.dbus.with_proxy("org.freedesktop.NetworkManager", &dev, TIMEOUT);
@@ -78,26 +114,14 @@ impl NetworkState {
       let active =
         proxy.get::<dbus::Path>("org.freedesktop.NetworkManager.Device", "ActiveConnection")?;
 
-      dbg!(&active);
-    }
+      let proxy = self.dbus.with_proxy("org.freedesktop.NetworkManager", &active, TIMEOUT);
+      // The path `active` won't exist if there is no active connection.
+      let Ok(id) = proxy.get::<String>("org.freedesktop.NetworkManager.Connection.Active", "Id")
+      else {
+        continue;
+      };
 
-    let nm = NetworkManager::new(&self.dbus);
-    let mut connections = vec![];
-
-    for d in nm.get_devices().unwrap() {
-      match d {
-        networkmanager::devices::Device::WiFi(w) => {
-          if let Ok(id) = w.active_connection().unwrap().id() {
-            connections.push(id);
-          }
-        }
-        networkmanager::devices::Device::Ethernet(e) => {
-          if e.active_connection().unwrap().id().is_ok() {
-            connections.push(e.interface().unwrap());
-          }
-        }
-        _ => {}
-      }
+      connections.push(id);
     }
 
     Ok(connections)
