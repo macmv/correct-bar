@@ -32,7 +32,7 @@ pub fn modules(include_bspwm: bool) -> (Vec<Module>, Vec<Module>, Vec<Module>) {
         SepModule.into(),
         modules::ALSA::new().into(),
         SepModule.into(),
-        modules::Network { primary: Color::from_hex(0x8866ff), secondary: SEP }.into(),
+        modules::Network::new(Color::from_hex(0x8866ff), SEP).into(),
       ]
     } else {
       vec![
@@ -41,7 +41,7 @@ pub fn modules(include_bspwm: bool) -> (Vec<Module>, Vec<Module>, Vec<Module>) {
         SepModule.into(),
         modules::ALSA::new().into(),
         SepModule.into(),
-        modules::Network { primary: Color::from_hex(0x8866ff), secondary: SEP }.into(),
+        modules::Network::new(Color::from_hex(0x8866ff), SEP).into(),
       ]
     },
     vec![

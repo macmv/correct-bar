@@ -1,45 +1,51 @@
-use std::cell::RefCell;
-
 use correct_bar::bar::{Color, ModuleImpl, Updater};
+use crossbeam_channel::Receiver;
 use dbus::blocking::Connection;
 use networkmanager::{
   devices::{Any, Wired},
   NetworkManager,
 };
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Network {
   pub primary:   Color,
   pub secondary: Color,
+
+  state: Arc<Mutex<NetworkState>>,
+  recv:  Receiver<()>,
 }
 
 struct NetworkState {
   dbus: Connection,
 }
 
-thread_local! {
-  static NETWORK: RefCell<Option<NetworkState>> = RefCell::new(None);
+impl Network {
+  pub fn new(primary: Color, secondary: Color) -> Network {
+    Self::new_inner(primary, secondary).unwrap()
+  }
+
+  fn new_inner(primary: Color, secondary: Color) -> Result<Network, ()> {
+    let state = NetworkState::new();
+
+    let (tx, rx) = crossbeam_channel::bounded(0);
+
+    Ok(Network { primary, secondary, recv: rx, state: Arc::new(Mutex::new(state)) })
+  }
 }
 
 impl ModuleImpl for Network {
   fn updater(&self) -> Updater { Updater::Never }
   fn render(&self, ctx: &mut correct_bar::bar::RenderContext) {
-    NETWORK.with(|n| {
-      let mut network = n.borrow_mut();
-      if network.is_none() {
-        *network = Some(NetworkState::new());
-      }
-      let n = network.as_mut().unwrap();
+    let s = self.state.lock();
 
-      for (i, c) in n.active_connection().iter().enumerate() {
-        if i != 0 {
-          ctx.draw_text(", ", self.secondary);
-        }
-        ctx.draw_text(&c, self.primary);
+    for (i, c) in s.active_connection().iter().enumerate() {
+      if i != 0 {
+        ctx.draw_text(", ", self.secondary);
       }
-
-      dbg!(n.active_connection());
-    })
+      ctx.draw_text(&c, self.primary);
+    }
   }
   fn box_clone(&self) -> Box<dyn ModuleImpl + Send + Sync> { Box::new(self.clone()) }
 }
