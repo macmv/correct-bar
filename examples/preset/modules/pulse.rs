@@ -184,6 +184,14 @@ impl Context {
     dyn FnOnce(&ServerInfo),
     |info: *const sys::pa_server_info| &ServerInfo { pa: info }
   );
+
+  callback_list!(
+    get_sink_info_list(),
+    pa_context_get_sink_info_list,
+    dyn FnMut(SinkInfo),
+    |info: *const sys::pa_sink_info| SinkInfo { pa: info }
+  );
+
   callback_list!(
     get_sink_input_info_list(),
     pa_context_get_sink_input_info_list,
@@ -274,6 +282,9 @@ impl ContextState {
 macro_rules! info_getter {
   ($self:ident, $field:ident: &str) => {
     unsafe { CStr::from_ptr((*$self.pa).$field).to_str().unwrap() }
+  };
+  ($self:ident, $field:ident: Volume) => {
+    unsafe { Volume { pa: (*$self.pa).$field } }
   };
   ($self:ident, $field:ident: $ty:ty) => {
     unsafe { (*$self.pa).$field }
@@ -417,6 +428,58 @@ info! { SinkInputInfo =>
   // pa_format_info *format;
 }
 
+struct SinkInfo {
+  pa: *const sys::pa_sink_info,
+}
+
+info! { SinkInfo =>
+  /// Name of the sink
+  name(&str);
+  /// Index of the sink
+  index(u32);
+  /// Volume of the sink
+  volume(Volume);
+
+  // pa_sample_spec sample_spec;        /// Sample spec of this sink
+  // pa_channel_map channel_map;        /// Channel map
+  // uint32_t owner_module;             /// Index of the owning module of this sink, or PA_INVALID_INDEX.
+  // int mute;                          /// Mute switch of the sink
+  // uint32_t monitor_source;           /// Index of the monitor source connected to this sink.
+  // const char *monitor_source_name;   /// The name of the monitor source.
+  // pa_usec_t latency;                 /// Length of queued audio in the output buffer.
+  // const char *driver;                /// Driver name
+  // pa_sink_flags_t flags;             /// Flags
+  // pa_proplist *proplist;             /// Property list
+  // pa_usec_t configured_latency;      /// The latency this device has been configured to.
+  // pa_volume_t base_volume;           /// Some kind of "base" volume that refers to unamplified/unattenuated volume in the context of the output device.
+  // pa_sink_state_t state;             /// State
+  // uint32_t n_volume_steps;           /// Number of volume steps for sinks which do not support arbitrary volumes.
+  // uint32_t card;                     /// Card index, or PA_INVALID_INDEX.
+  // uint32_t n_ports;                  /// Number of entries in port array
+  // pa_sink_port_info** ports;         /// Array of available ports, or NULL. Array is terminated by an entry set to NULL. The number of entries is stored in n_ports.
+  // pa_sink_port_info* active_port;    /// Pointer to active port in the array, or NULL.
+  // uint8_t n_formats;                 /// Number of formats supported by the sink.
+  // pa_format_info **formats;          /// Array of formats supported by the sink.
+}
+
+struct Volume {
+  pa: sys::pa_cvolume,
+}
+
+impl Volume {
+  fn channels(&self) -> u8 { self.pa.channels }
+  fn values(&self) -> &[u32] { &self.pa.values[..self.channels() as usize] }
+}
+
+impl fmt::Debug for Volume {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("Volume")
+      .field("channels", &self.channels())
+      .field("values", &self.values())
+      .finish()
+  }
+}
+
 impl Pulse {
   pub fn new(color: Color) -> Self {
     let (tx, rx) = crossbeam_channel::bounded(16);
@@ -439,7 +502,7 @@ impl Pulse {
               move |info| {
                 println!("got server info: {:?}", info);
 
-                ctx.get_sink_input_info_list(|info| {
+                ctx.get_sink_info_list(|info| {
                   println!("got sink info: {:?}", info);
                 });
               }
