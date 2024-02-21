@@ -45,11 +45,22 @@ struct Context {
   pa: *mut sys::pa_context,
 }
 
+unsafe impl Send for Context {}
+
 impl Drop for Context {
   fn drop(&mut self) {
     unsafe {
       sys::pa_context_unref(self.pa);
     }
+  }
+}
+
+impl Clone for Context {
+  fn clone(&self) -> Self {
+    unsafe {
+      sys::pa_context_ref(self.pa);
+    }
+    Context { pa: self.pa }
   }
 }
 
@@ -91,6 +102,10 @@ impl Context {
         std::ptr::null(),
       );
     }
+  }
+
+  pub fn get_state(&self) -> ContextState {
+    unsafe { ContextState::from_sys(sys::pa_context_get_state(self.pa)) }
   }
 }
 
@@ -138,33 +153,60 @@ impl fmt::Debug for PropList {
   }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum ContextState {
+  Unconnected,
+  Connecting,
+  Authorizing,
+  SettingName,
+  Ready,
+  Failed,
+  Terminated,
+  Unknown,
+}
+
+impl ContextState {
+  pub fn from_sys(s: sys::pa_context_state_t) -> Self {
+    match s {
+      sys::PA_CONTEXT_UNCONNECTED => ContextState::Unconnected,
+      sys::PA_CONTEXT_CONNECTING => ContextState::Connecting,
+      sys::PA_CONTEXT_AUTHORIZING => ContextState::Authorizing,
+      sys::PA_CONTEXT_SETTING_NAME => ContextState::SettingName,
+      sys::PA_CONTEXT_READY => ContextState::Ready,
+      sys::PA_CONTEXT_FAILED => ContextState::Failed,
+      sys::PA_CONTEXT_TERMINATED => ContextState::Terminated,
+
+      #[allow(unreachable_patterns)]
+      _ => ContextState::Unknown,
+    }
+  }
+}
+
 impl Pulse {
   pub fn new(color: Color) -> Self {
     let (tx, rx) = crossbeam_channel::bounded(16);
 
-    println!("spawning thread");
     std::thread::spawn(move || {
-      println!("creating main loop");
       let mut l = MainLoop::new();
 
-      let mut props = PropList::new();
+      let props = PropList::new();
 
-      println!("creating context");
       let mut ctx = Context::new(&mut l, &props);
 
-      println!("setting context");
-      ctx.set_callback(|| {
-        println!("state change!");
+      ctx.set_callback({
+        let ctx = ctx.clone();
+        move || {
+          if ctx.get_state() == ContextState::Ready {
+            println!("ready");
+          }
+        }
       });
 
-      println!("connecting");
       ctx.connect();
-      println!("connected");
 
       tx.send(()).unwrap();
 
       l.run();
-      panic!("loop exitted");
     });
 
     Pulse { color, recv: rx }
