@@ -64,6 +64,31 @@ impl Clone for Context {
   }
 }
 
+macro_rules! callback {
+  ($name:ident, $sys:ident, dyn FnOnce($ty:ty), |$info:ident: $info_ty:ty| $constructor:expr) => {
+    pub fn $name(&self, custom: impl FnOnce($ty) + Send + 'static) {
+      extern "C" fn callback(_ctx: *mut sys::pa_context, $info: $info_ty, ptr: *mut c_void) {
+        unsafe {
+          let cb = Box::from_raw(ptr.cast::<Box<dyn FnOnce($ty)>>());
+          cb($constructor);
+        }
+      }
+
+      unsafe {
+        // Box it up twice:
+        // - The outer box is converted to a pointer and passed through pa_context.
+        // - The inner box is a fat pointer to allow for a `dyn` fn.
+        let cb: Box<Box<dyn FnOnce($ty) + Send>> = Box::new(Box::new(custom));
+        sys::pa_context_get_server_info(
+          self.pa,
+          Some(callback),
+          Box::into_raw(cb).cast::<c_void>(),
+        );
+      }
+    }
+  };
+}
+
 impl Context {
   pub fn new(mainloop: &mut MainLoop, props: &PropList) -> Self {
     unsafe {
@@ -108,24 +133,12 @@ impl Context {
     unsafe { ContextState::from_sys(sys::pa_context_get_state(self.pa)) }
   }
 
-  pub fn get_server_info(&self, custom: impl FnOnce(&ServerInfo) + Send + 'static) {
-    static CALLBACK: Mutex<Option<Box<dyn FnOnce(&ServerInfo) + Send>>> = Mutex::new(None);
-    extern "C" fn cb(
-      _ctx: *mut sys::pa_context,
-      info: *const sys::pa_server_info,
-      _userdata: *mut c_void,
-    ) {
-      let mut cb = CALLBACK.lock();
-      if let Some(cb) = cb.take() {
-        cb(&ServerInfo { pa: info });
-      }
-    }
-
-    CALLBACK.lock().replace(Box::new(custom));
-    unsafe {
-      sys::pa_context_get_server_info(self.pa, Some(cb), ptr::null_mut());
-    }
-  }
+  callback!(
+    get_server_info,
+    pa_context_get_server_info,
+    dyn FnOnce(&ServerInfo),
+    |info: *const sys::pa_server_info| &ServerInfo { pa: info }
+  );
 }
 
 struct PropList {
@@ -277,6 +290,10 @@ impl Pulse {
 
             ctx.get_server_info(|info| {
               println!("got server info: {:?}", info);
+
+              // ctx.get_source_info(info.default_source_name(), |info| {
+              //   println!("got source info: {:?}", info);
+              // });
             });
           }
         }
