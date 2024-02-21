@@ -468,8 +468,21 @@ struct Volume {
 }
 
 impl Volume {
-  fn channels(&self) -> u8 { self.pa.channels }
-  fn values(&self) -> &[u32] { &self.pa.values[..self.channels() as usize] }
+  pub fn channels(&self) -> u8 { self.pa.channels }
+  pub fn values(&self) -> &[u32] { &self.pa.values[..self.channels() as usize] }
+
+  pub fn value_percents(&self) -> Vec<u32> {
+    // According to `pactl`, this is how we find the percent:
+    // ```
+    // ((v * 100 + PA_VOLUME_NORM / 2) / PA_VOLUME_NORM));
+    // ```
+
+    self
+      .values()
+      .iter()
+      .map(|v| (v * 100 + sys::PA_VOLUME_NORM / 2) / sys::PA_VOLUME_NORM)
+      .collect()
+  }
 }
 
 impl fmt::Debug for Volume {
@@ -477,6 +490,7 @@ impl fmt::Debug for Volume {
     f.debug_struct("Volume")
       .field("channels", &self.channels())
       .field("values", &self.values())
+      .field("value_percents", &self.value_percents())
       .finish()
   }
 }
