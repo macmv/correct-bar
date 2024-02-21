@@ -306,7 +306,7 @@ impl ALSA {
 
   fn new_inner() -> Result<Self> {
     // TODO: Remove this hardcoded ID
-    let control = Control::new(1)?;
+    let control = Control::new(2)?;
 
     let (tx, rx) = crossbeam_channel::bounded(16);
     let elem = {
