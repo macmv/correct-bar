@@ -5,10 +5,6 @@ use dbus::{
   channel::MatchingReceiver,
   message::MatchRule,
 };
-use networkmanager::{
-  devices::{Any, Wired},
-  NetworkManager,
-};
 use parking_lot::Mutex;
 use std::{sync::Arc, time::Duration};
 
