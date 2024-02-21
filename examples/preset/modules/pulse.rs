@@ -290,14 +290,43 @@ struct SourceOutputInfo {
   pa: *const sys::pa_source_output_info,
 }
 
-impl SourceOutputInfo {
-  fn index(&self) -> u32 { unsafe { (*self.pa).index } }
-}
-
-impl fmt::Debug for SourceOutputInfo {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_struct("SourceOutputInfo").field("index", &self.index()).finish()
-  }
+info! { SourceOutputInfo =>
+  /// Index of the source output.
+  index(u32);
+  /// Name of the source output.
+  name(&str);
+  /// Index of the module this source output belongs to, or PA_INVALID_INDEX when it does not belong to any module.
+  owner_module(u32);
+  /// Index of the client this source output belongs to, or PA_INVALID_INDEX when it does not belong to any client.
+  client(u32);
+  /// Index of the connected source.
+  source(u32);
+  // /// The sample specification of the source output.
+  // sample_spec( pa_sample_spec);
+  // /// Channel map.
+  // channel_map( pa_channel_map);
+  // /// Latency due to buffering in the source output, see pa_timing_info for details.
+  // buffer_usec( pa_usec_t);
+  // /// Latency of the source device, see pa_timing_info for details.
+  // source_usec( pa_usec_t);
+  /// The resampling method used by this source output.
+  resample_method(&str);
+  /// Driver name.
+  driver(&str);
+  // /// Property list.
+  // proplist(pa_proplist);
+  /// Stream corked.
+  corked(i32);
+  // /// The volume of this source output.
+  // volume( pa_cvolume);
+  /// Stream muted.
+  mute(i32);
+  /// Stream has volume. If not set, then the meaning of this struct's volume member is unspecified.
+  has_volume(i32);
+  /// The volume can be set. If not set, the volume can still change even though clients can't control the volume.
+  volume_writable(i32);
+  // /// Stream format information.
+  // format( pa_format_info);
 }
 
 impl Pulse {
