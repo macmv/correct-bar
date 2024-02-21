@@ -65,9 +65,14 @@ impl Clone for Context {
 }
 
 macro_rules! callback {
-  ($name:ident, $sys:ident, dyn FnOnce($ty:ty), |$info:ident: $info_ty:ty| $constructor:expr) => {
-    pub fn $name(&self, custom: impl FnOnce($ty) + Send + 'static) {
-      extern "C" fn callback(_ctx: *mut sys::pa_context, $info: $info_ty, ptr: *mut c_void) {
+  ($name:ident($($arg_name:ident: $arg_ty:ty)*), $sys:ident, dyn FnOnce($ty:ty), |$info:ident: $info_ty:ty| $constructor:expr $(, $eol:tt)?) => {
+    pub fn $name(&self, $($arg_name: $arg_ty,)* custom: impl FnOnce($ty) + Send + 'static) {
+      extern "C" fn callback(
+        _ctx: *mut sys::pa_context,
+        $info: $info_ty,
+        $($eol: i32,)?
+        ptr: *mut c_void
+      ) {
         unsafe {
           let cb = Box::from_raw(ptr.cast::<Box<dyn FnOnce($ty)>>());
           cb($constructor);
@@ -79,8 +84,9 @@ macro_rules! callback {
         // - The outer box is converted to a pointer and passed through pa_context.
         // - The inner box is a fat pointer to allow for a `dyn` fn.
         let cb: Box<Box<dyn FnOnce($ty) + Send>> = Box::new(Box::new(custom));
-        sys::pa_context_get_server_info(
+        sys::$sys(
           self.pa,
+          $($arg_name,)*
           Some(callback),
           Box::into_raw(cb).cast::<c_void>(),
         );
@@ -134,10 +140,17 @@ impl Context {
   }
 
   callback!(
-    get_server_info,
+    get_server_info(),
     pa_context_get_server_info,
     dyn FnOnce(&ServerInfo),
     |info: *const sys::pa_server_info| &ServerInfo { pa: info }
+  );
+  callback!(
+    get_source_info(),
+    pa_context_get_source_output_info_list,
+    dyn FnOnce(&SourceOutputInfo),
+    |info: *const sys::pa_source_output_info| &SourceOutputInfo { pa: info },
+    _eol
   );
 }
 
@@ -214,60 +227,76 @@ impl ContextState {
   }
 }
 
+macro_rules! info_getter {
+  ($self:ident, $field:ident: &str) => {
+    unsafe { CStr::from_ptr((*$self.pa).$field).to_str().unwrap() }
+  };
+  ($self:ident, $field:ident: $ty:ty) => {
+    unsafe { (*$self.pa).$field }
+  };
+}
+
+macro_rules! info {
+  { $name: ident =>
+    $(
+      $(#[$meta:meta])* $field:ident($($ty:tt)*);
+    )*
+  } => {
+    impl $name {
+      $(
+        $(#[$meta])*
+        pub fn $field(&self) -> $($ty)* { info_getter!(self, $field: $($ty)*) }
+      )*
+    }
+
+    impl fmt::Debug for $name {
+      fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct(stringify!($name))
+          $(
+            .field(stringify!($field), &self.$field())
+          )*
+          .finish()
+      }
+    }
+  };
+}
+
 struct ServerInfo {
   pa: *const sys::pa_server_info,
 }
 
-impl ServerInfo {
+info! { ServerInfo =>
   /// User name of the daemon process.
-  fn user_name(&self) -> &str { unsafe { CStr::from_ptr((*self.pa).user_name).to_str().unwrap() } }
-
+  user_name(&str);
   /// Host name the daemon is running on.
-  fn host_name(&self) -> &str { unsafe { CStr::from_ptr((*self.pa).host_name).to_str().unwrap() } }
-
+  host_name(&str);
   /// Version string of the daemon.
-  fn server_version(&self) -> &str {
-    unsafe { CStr::from_ptr((*self.pa).server_version).to_str().unwrap() }
-  }
-
+  server_version(&str);
   /// Server package name (usually "pulseaudio").
-  fn server_name(&self) -> &str {
-    unsafe { CStr::from_ptr((*self.pa).server_name).to_str().unwrap() }
-  }
-
+  server_name(&str);
   /// Default sample specification
-  fn sample_spec(&self) -> sys::pa_sample_spec { unsafe { (*self.pa).sample_spec } }
-
+  sample_spec(sys::pa_sample_spec);
   /// Name of default sink.
-  fn default_sink_name(&self) -> &str {
-    unsafe { CStr::from_ptr((*self.pa).default_sink_name).to_str().unwrap() }
-  }
-
+  default_sink_name(&str);
   /// Name of default source.
-  fn default_source_name(&self) -> &str {
-    unsafe { CStr::from_ptr((*self.pa).default_source_name).to_str().unwrap() }
-  }
-
+  default_source_name(&str);
   /// A random cookie for identifying this instance of PulseAudio.
-  fn cookie(&self) -> u32 { unsafe { (*self.pa).cookie } }
-
+  cookie(u32);
   /// Default channel map.
-  fn channel_map(&self) -> sys::pa_channel_map { unsafe { (*self.pa).channel_map } }
+  channel_map(sys::pa_channel_map);
 }
 
-impl fmt::Debug for ServerInfo {
+struct SourceOutputInfo {
+  pa: *const sys::pa_source_output_info,
+}
+
+impl SourceOutputInfo {
+  fn index(&self) -> u32 { unsafe { (*self.pa).index } }
+}
+
+impl fmt::Debug for SourceOutputInfo {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_struct("ServerInfo")
-      .field("user_name", &self.user_name())
-      .field("host_name", &self.host_name())
-      .field("server_version", &self.server_version())
-      .field("server_name", &self.server_name())
-      .field("sample_spec", &self.sample_spec())
-      .field("default_sink_name", &self.default_sink_name())
-      .field("default_source_name", &self.default_source_name())
-      .field("cookie", &self.cookie())
-      .field("channel_map", &self.channel_map())
-      .finish()
+    f.debug_struct("SourceOutputInfo").field("index", &self.index()).finish()
   }
 }
 
@@ -288,12 +317,15 @@ impl Pulse {
           if ctx.get_state() == ContextState::Ready {
             println!("ready");
 
-            ctx.get_server_info(|info| {
-              println!("got server info: {:?}", info);
+            ctx.get_server_info({
+              let ctx = ctx.clone();
+              move |info| {
+                println!("got server info: {:?}", info);
 
-              // ctx.get_source_info(info.default_source_name(), |info| {
-              //   println!("got source info: {:?}", info);
-              // });
+                ctx.get_source_info(|info| {
+                  println!("got source info: {:?}", info.pa);
+                });
+              }
             });
           }
         }
