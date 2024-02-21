@@ -65,12 +65,12 @@ impl Clone for Context {
 }
 
 macro_rules! callback {
-  ($name:ident($($arg_name:ident: $arg_ty:ty)*), $sys:ident, dyn FnOnce($ty:ty), |$info:ident: $info_ty:ty| $constructor:expr $(, $eol:tt)?) => {
+  ($name:ident($($arg_name:ident: $arg_ty:ty)*), $sys:ident, dyn FnOnce($ty:ty), |$info:ident: $info_ty:ty| $constructor:expr) => {
+    #[allow(unused)]
     pub fn $name(&self, $($arg_name: $arg_ty,)* custom: impl FnOnce($ty) + Send + 'static) {
       extern "C" fn callback(
         _ctx: *mut sys::pa_context,
         $info: $info_ty,
-        $($eol: i32,)?
         ptr: *mut c_void
       ) {
         unsafe {
@@ -84,6 +84,45 @@ macro_rules! callback {
         // - The outer box is converted to a pointer and passed through pa_context.
         // - The inner box is a fat pointer to allow for a `dyn` fn.
         let cb: Box<Box<dyn FnOnce($ty) + Send>> = Box::new(Box::new(custom));
+        sys::$sys(
+          self.pa,
+          $($arg_name,)*
+          Some(callback),
+          Box::into_raw(cb).cast::<c_void>(),
+        );
+      }
+    }
+  };
+}
+
+macro_rules! callback_list {
+  ($name:ident($($arg_name:ident: $arg_ty:ty)*), $sys:ident, dyn FnMut($ty:ty), |$info:ident: $info_ty:ty| $constructor:expr) => {
+    #[allow(unused)]
+    pub fn $name(&self, $($arg_name: $arg_ty,)* custom: impl FnMut($ty) + Send + 'static) {
+      extern "C" fn callback(
+        _ctx: *mut sys::pa_context,
+        $info: $info_ty,
+        eol: i32,
+        ptr: *mut c_void
+      ) {
+        unsafe {
+          let cb = Box::from_raw(ptr.cast::<Box<dyn FnMut($ty)>>());
+          if eol == 0 {
+            // Make sure to keep this box around.
+            let cb = Box::leak(cb);
+            cb($constructor);
+          } else {
+            // Now that `eol` is nonzero, we're at the end of the list, so we drop the `cb`.
+            drop(cb);
+          }
+        }
+      }
+
+      unsafe {
+        // Box it up twice:
+        // - The outer box is converted to a pointer and passed through pa_context.
+        // - The inner box is a fat pointer to allow for a `dyn` fn.
+        let cb: Box<Box<dyn FnMut($ty) + Send>> = Box::new(Box::new(custom));
         sys::$sys(
           self.pa,
           $($arg_name,)*
@@ -145,12 +184,17 @@ impl Context {
     dyn FnOnce(&ServerInfo),
     |info: *const sys::pa_server_info| &ServerInfo { pa: info }
   );
-  callback!(
-    get_source_info(),
+  callback_list!(
+    get_sink_input_info_list(),
+    pa_context_get_sink_input_info_list,
+    dyn FnMut(SinkInputInfo),
+    |info: *const sys::pa_sink_input_info| SinkInputInfo { pa: info }
+  );
+  callback_list!(
+    get_source_output_info_list(),
     pa_context_get_source_output_info_list,
-    dyn FnOnce(&SourceOutputInfo),
-    |info: *const sys::pa_source_output_info| &SourceOutputInfo { pa: info },
-    _eol
+    dyn FnMut(SourceOutputInfo),
+    |info: *const sys::pa_source_output_info| SourceOutputInfo { pa: info }
   );
 }
 
@@ -329,6 +373,50 @@ info! { SourceOutputInfo =>
   // format( pa_format_info);
 }
 
+struct SinkInputInfo {
+  pa: *const sys::pa_sink_input_info,
+}
+
+info! { SinkInputInfo =>
+  /// Index of the sink input
+  index(u32);
+  /// Name of the sink input
+  name(&str);
+  /// Index of the module this sink input belongs to, or PA_INVALID_INDEX when it does not belong to any module.
+  owner_module(u32);
+  /// Index of the client this sink input belongs to, or PA_INVALID_INDEX when it does not belong to any client.
+  client(u32);
+  /// Index of the connected sink
+  sink(u32);
+
+  // /// The sample specification of the sink input.
+  // pa_sample_spec sample_spec;
+  // /// Channel map
+  // pa_channel_map channel_map;
+  // /// The volume of this sink input.
+  // pa_cvolume volume;
+  // /// Latency due to buffering in sink input, see pa_timing_info for details.
+  // pa_usec_t buffer_usec;
+  // /// Latency of the sink device, see pa_timing_info for details.
+  // pa_usec_t sink_usec;
+  // /// The resampling method used by this sink input.
+  // const char *resample_method;
+  // /// Driver name
+  // const char *driver;
+  // /// Stream muted
+  // int mute;
+  // /// Property list
+  // pa_proplist *proplist;
+  // /// Stream corked
+  // int corked;
+  // /// Stream has volume. If not set, then the meaning of this struct's volume member is unspecified.
+  // int has_volume;
+  // /// The volume can be set. If not set, the volume can still change even though clients can't control the volume.
+  // int volume_writable;
+  // /// Stream format information.
+  // pa_format_info *format;
+}
+
 impl Pulse {
   pub fn new(color: Color) -> Self {
     let (tx, rx) = crossbeam_channel::bounded(16);
@@ -351,8 +439,8 @@ impl Pulse {
               move |info| {
                 println!("got server info: {:?}", info);
 
-                ctx.get_source_info(|info| {
-                  println!("got source info: {:?}", info.pa);
+                ctx.get_sink_input_info_list(|info| {
+                  println!("got sink info: {:?}", info);
                 });
               }
             });
