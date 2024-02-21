@@ -439,6 +439,8 @@ info! { SinkInfo =>
   index(u32);
   /// Volume of the sink
   volume(Volume);
+  /// Some kind of "base" volume that refers to unamplified/unattenuated volume in the context of the output device.
+  base_volume(u32);
 
   // pa_sample_spec sample_spec;        /// Sample spec of this sink
   // pa_channel_map channel_map;        /// Channel map
@@ -451,7 +453,6 @@ info! { SinkInfo =>
   // pa_sink_flags_t flags;             /// Flags
   // pa_proplist *proplist;             /// Property list
   // pa_usec_t configured_latency;      /// The latency this device has been configured to.
-  // pa_volume_t base_volume;           /// Some kind of "base" volume that refers to unamplified/unattenuated volume in the context of the output device.
   // pa_sink_state_t state;             /// State
   // uint32_t n_volume_steps;           /// Number of volume steps for sinks which do not support arbitrary volumes.
   // uint32_t card;                     /// Card index, or PA_INVALID_INDEX.
