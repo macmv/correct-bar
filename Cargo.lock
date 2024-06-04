@@ -157,6 +157,7 @@ dependencies = [
  "serde",
  "serde_json",
  "wayland-client",
+ "wayland-protocols",
  "xcb",
  "xcb-util-cursor",
 ]
@@ -710,6 +711,18 @@ dependencies = [
  "bitflags 2.4.2",
  "rustix",
  "wayland-backend",
+ "wayland-scanner",
+]
+
+[[package]]
+name = "wayland-protocols"
+version = "0.32.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83d0f1056570486e26a3773ec633885124d79ae03827de05ba6c85f79904026c"
+dependencies = [
+ "bitflags 2.4.2",
+ "wayland-backend",
+ "wayland-client",
  "wayland-scanner",
 ]
 

@@ -3,14 +3,20 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use wayland_client::{
   backend::ObjectId,
-  protocol::{wl_output, wl_registry},
+  protocol::{wl_compositor, wl_output, wl_registry, wl_shm, wl_shm_pool, wl_surface},
   Connection, Dispatch, Proxy, QueueHandle,
 };
+use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 
 use crate::{bar::Bar, config::Config};
 
+#[derive(Default)]
 struct AppData {
   monitors: Vec<Monitor>,
+  shm_pool: Option<wl_shm_pool::WlShmPool>,
+
+  // FIXME: This needs to be per-bar.
+  surface: Option<wl_surface::WlSurface>,
 }
 
 #[derive(Debug)]
@@ -73,6 +79,84 @@ impl Dispatch<wl_output::WlOutput, ()> for AppData {
   }
 }
 
+impl Dispatch<wl_shm_pool::WlShmPool, ()> for AppData {
+  fn event(
+    state: &mut Self,
+    output: &wl_shm_pool::WlShmPool,
+    event: wl_shm_pool::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<AppData>,
+  ) {
+    println!("shm pool event: {:?}", event);
+  }
+}
+
+impl Dispatch<wl_compositor::WlCompositor, ()> for AppData {
+  fn event(
+    state: &mut Self,
+    output: &wl_compositor::WlCompositor,
+    event: wl_compositor::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<AppData>,
+  ) {
+    println!("compositor event: {:?}", event);
+  }
+}
+
+impl Dispatch<wl_surface::WlSurface, ()> for AppData {
+  fn event(
+    state: &mut Self,
+    surface: &wl_surface::WlSurface,
+    event: wl_surface::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<AppData>,
+  ) {
+    println!("surface event: {:?}", event);
+  }
+}
+
+impl Dispatch<xdg_wm_base::XdgWmBase, ()> for AppData {
+  fn event(
+    state: &mut Self,
+    surface: &xdg_wm_base::XdgWmBase,
+    event: xdg_wm_base::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<AppData>,
+  ) {
+    println!("wm_base event: {:?}", event);
+  }
+}
+
+impl Dispatch<xdg_surface::XdgSurface, ()> for AppData {
+  fn event(
+    state: &mut Self,
+    surface: &xdg_surface::XdgSurface,
+    event: xdg_surface::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<AppData>,
+  ) {
+    println!("xdg_surface event: {:?}", event);
+  }
+}
+
+impl Dispatch<xdg_toplevel::XdgToplevel, ()> for AppData {
+  fn event(
+    state: &mut Self,
+    surface: &xdg_toplevel::XdgToplevel,
+    event: xdg_toplevel::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<AppData>,
+  ) {
+    println!("xdg_toplevel event: {:?}", event);
+  }
+}
+
 impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
   fn event(
     state: &mut Self,
@@ -86,6 +170,30 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
       if interface == wl_output::WlOutput::interface().name {
         let output = registry.bind::<wl_output::WlOutput, _, _>(name, version, qh, ());
         state.monitors.push(Monitor { id: output.id(), ..Default::default() });
+      } else if interface == wl_compositor::WlCompositor::interface().name {
+        println!("compositor found");
+
+        let compositor = registry.bind::<wl_compositor::WlCompositor, _, _>(name, version, qh, ());
+        state.surface = Some(compositor.create_surface(qh, ()));
+      } else if interface == xdg_wm_base::XdgWmBase::interface().name {
+        println!("xdg_wm_base found");
+
+        let wm_base = registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, version, qh, ());
+
+        let surface = state.surface.take().unwrap();
+        let xdg_surface = wm_base.get_xdg_surface(&surface, qh, ());
+
+        xdg_surface.get_toplevel(qh, ());
+        xdg_surface.set_window_geometry(50, 50, 100, 100);
+
+        surface.commit();
+
+        println!("created xdg_surface: {:?}", xdg_surface);
+      } else if interface == wl_shm::WlShm::interface().name {
+        // let pool = registry.bind::<wl_shm::WlShm, _, _>(name, version, qh, ());
+        // pool.create_pool(fd, size, qh, udata)
+
+        println!("found an shm pool");
       }
     }
   }
@@ -100,7 +208,7 @@ pub fn setup(config: Config) -> Vec<Arc<Mutex<Bar>>> {
   let qh = event_queue.handle();
   display.get_registry(&qh, ());
 
-  let mut app = AppData { monitors: vec![] };
+  let mut app = AppData::default();
 
   loop {
     event_queue.roundtrip(&mut app).unwrap();
