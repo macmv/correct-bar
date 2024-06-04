@@ -40,7 +40,7 @@ impl Window {
     // std::fs::read("/usr/share/fonts/TTF/icomoon-feather.ttf").unwrap();
     Window {
       buf:  Buffer::new(width, height),
-      font: FontWithCache::load("/usr/share/fonts/TTF/iosevka-regular.ttc"),
+      font: FontWithCache::load("/usr/share/fonts/TTF/Iosevka-Regular.ttc"),
     }
   }
   pub fn width(&self) -> u32 { self.buf.width }
