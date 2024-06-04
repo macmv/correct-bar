@@ -7,7 +7,7 @@ use bar::Updater;
 use config::Config;
 
 pub fn run(config: Config) {
-  let bars = backend::x11::setup(config);
+  let bars = backend::wayland::setup(config);
 
   let mut all_modules = vec![];
   let mut sleep_duration = None;
