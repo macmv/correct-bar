@@ -6,10 +6,22 @@ pub mod math;
 use bar::Updater;
 use config::Config;
 
-struct App {}
+use crate::bar::Module;
+
+struct App {
+  left_modules:   Vec<Module>,
+  center_modules: Vec<Module>,
+  right_modules:  Vec<Module>,
+}
 
 impl App {
-  pub fn new(config: Config) -> Self { App {} }
+  pub fn new(config: Config) -> Self {
+    App {
+      left_modules:   config.modules_left,
+      center_modules: config.modules_middle,
+      right_modules:  config.modules_right,
+    }
+  }
 }
 
 pub fn run(config: Config) {
