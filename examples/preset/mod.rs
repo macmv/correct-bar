@@ -30,7 +30,7 @@ pub fn modules(include_bspwm: bool) -> (Vec<Module>, Vec<Module>, Vec<Module>) {
         // SepModule.into(),
         modules::Train { primary: SEP, pos: 0.into() }.into(),
         SepModule.into(),
-        modules::ALSA::new().into(),
+        // modules::ALSA::new().into(),
         SepModule.into(),
         modules::Pulse::new(Color::from_hex(0x55dd55)).into(),
         SepModule.into(),
