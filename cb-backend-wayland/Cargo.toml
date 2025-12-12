@@ -1,0 +1,8 @@
+[package]
+name = "cb-backend-wayland"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+wayland-client = { version = "0.31.11" }
+wayland-protocols = { version = "0.32.9", features = ["client"] }

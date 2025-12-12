@@ -8,6 +8,8 @@ edition = "2021"
 [lib]
 
 [dependencies]
+cb-backend-wayland = { path = "cb-backend-wayland" }
+
 crossbeam-channel = "0.5.15"
 parking_lot = "0.12.5"
 rusttype = "0.9.3"
@@ -26,3 +28,8 @@ libpulse-sys = "1.23.0"
 [features]
 default = ["wayland"]
 wayland = ["wayland-client", "wayland-protocols"]
+
+[workspace]
+members = [
+  "cb-backend-wayland",
+]
