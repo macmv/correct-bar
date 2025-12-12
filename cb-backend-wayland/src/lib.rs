@@ -10,15 +10,16 @@ struct AppData {
   monitors:  Vec<Monitor>,
   _shm_pool: Option<wl_shm_pool::WlShmPool>,
 
-  // FIXME: This needs to be per-bar.
-  surface:       Option<wl_surface::WlSurface>,
-  shell:         Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
-  layer_surface: Option<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1>,
+  compositor: Option<wl_compositor::WlCompositor>,
+  shell:      Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
 }
 
 #[derive(Debug)]
 struct Monitor {
   output: wl_output::WlOutput,
+
+  surface:       Option<wl_surface::WlSurface>,
+  layer_surface: Option<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1>,
 
   // Logical position.
   x: i32,
@@ -34,33 +35,41 @@ struct Monitor {
 
 impl AppData {
   fn on_change(&mut self, qh: &QueueHandle<AppData>) {
-    if self.layer_surface.is_none()
-      && let Some(surface) = &self.surface
-      && let Some(shell) = &self.shell
-      && let Some(monitor) = self.monitors.get(0)
+    if let Some(shell) = &self.shell
+      && let Some(compositor) = &self.compositor
     {
-      let layer_surface = shell.get_layer_surface(
-        surface,
-        Some(&monitor.output),
-        zwlr_layer_shell_v1::Layer::Background,
-        "foo".into(),
-        qh,
-        (),
-      );
+      for monitor in &mut self.monitors {
+        if monitor.surface.is_none() {
+          monitor.surface = Some(compositor.create_surface(qh, ()));
+        }
 
-      layer_surface.set_size(0, 20);
-      layer_surface.set_anchor(
-        zwlr_layer_surface_v1::Anchor::Top
-          | zwlr_layer_surface_v1::Anchor::Left
-          | zwlr_layer_surface_v1::Anchor::Right,
-      );
-      layer_surface.set_margin(0, 0, 0, 0);
-      layer_surface.set_exclusive_edge(zwlr_layer_surface_v1::Anchor::Top);
-      layer_surface.set_exclusive_zone(20);
+        if monitor.layer_surface.is_none() {
+          let surface = monitor.surface.as_ref().unwrap();
 
-      surface.commit();
+          let layer_surface = shell.get_layer_surface(
+            surface,
+            Some(&monitor.output),
+            zwlr_layer_shell_v1::Layer::Background,
+            "foo".into(),
+            qh,
+            (),
+          );
 
-      self.layer_surface = Some(layer_surface);
+          layer_surface.set_size(0, 20);
+          layer_surface.set_anchor(
+            zwlr_layer_surface_v1::Anchor::Top
+              | zwlr_layer_surface_v1::Anchor::Left
+              | zwlr_layer_surface_v1::Anchor::Right,
+          );
+          layer_surface.set_margin(0, 0, 0, 0);
+          layer_surface.set_exclusive_edge(zwlr_layer_surface_v1::Anchor::Top);
+          layer_surface.set_exclusive_zone(20);
+
+          surface.commit();
+
+          monitor.layer_surface = Some(layer_surface);
+        }
+      }
     }
   }
 }
@@ -220,11 +229,18 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
   ) {
     if let wl_registry::Event::Global { name, interface, version } = event {
       if interface == wl_output::WlOutput::interface().name {
-        let output = registry.bind::<wl_output::WlOutput, _, _>(name, version, qh, ());
-        state.monitors.push(Monitor { output, x: 0, y: 0, width: 0, height: 0, scale: 1 });
+        state.monitors.push(Monitor {
+          output:        registry.bind(name, version, qh, ()),
+          surface:       None,
+          layer_surface: None,
+          x:             0,
+          y:             0,
+          width:         0,
+          height:        0,
+          scale:         1,
+        });
       } else if interface == wl_compositor::WlCompositor::interface().name {
-        let compositor = registry.bind::<wl_compositor::WlCompositor, _, _>(name, version, qh, ());
-        state.surface = Some(compositor.create_surface(qh, ()));
+        state.compositor = Some(registry.bind(name, version, qh, ()));
       } else if interface == zwlr_layer_shell_v1::ZwlrLayerShellV1::interface().name {
         state.shell = Some(registry.bind(name, version, qh, ()));
       }
