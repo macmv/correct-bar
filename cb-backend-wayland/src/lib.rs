@@ -1,9 +1,9 @@
 use wayland_client::{
-  backend::ObjectId,
-  protocol::{wl_compositor, wl_output, wl_registry, wl_shm, wl_shm_pool, wl_surface},
   Connection, Dispatch, Proxy, QueueHandle,
+  protocol::{wl_compositor, wl_output, wl_registry, wl_shm, wl_shm_pool, wl_surface},
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
+use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
 #[derive(Default)]
 struct AppData {
@@ -11,12 +11,14 @@ struct AppData {
   _shm_pool: Option<wl_shm_pool::WlShmPool>,
 
   // FIXME: This needs to be per-bar.
-  surface: Option<wl_surface::WlSurface>,
+  surface:       Option<wl_surface::WlSurface>,
+  shell:         Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
+  layer_surface: Option<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1>,
 }
 
 #[derive(Debug)]
 struct Monitor {
-  id: ObjectId,
+  output: wl_output::WlOutput,
 
   // Logical position.
   x: i32,
@@ -30,8 +32,37 @@ struct Monitor {
   scale: i32,
 }
 
-impl Default for Monitor {
-  fn default() -> Self { Self { id: ObjectId::null(), x: 0, y: 0, width: 0, height: 0, scale: 0 } }
+impl AppData {
+  fn on_change(&mut self, qh: &QueueHandle<AppData>) {
+    if self.layer_surface.is_none()
+      && let Some(surface) = &self.surface
+      && let Some(shell) = &self.shell
+      && let Some(monitor) = self.monitors.get(0)
+    {
+      let layer_surface = shell.get_layer_surface(
+        surface,
+        Some(&monitor.output),
+        zwlr_layer_shell_v1::Layer::Background,
+        "foo".into(),
+        qh,
+        (),
+      );
+
+      layer_surface.set_size(0, 20);
+      layer_surface.set_anchor(
+        zwlr_layer_surface_v1::Anchor::Top
+          | zwlr_layer_surface_v1::Anchor::Left
+          | zwlr_layer_surface_v1::Anchor::Right,
+      );
+      layer_surface.set_margin(0, 0, 0, 0);
+      layer_surface.set_exclusive_edge(zwlr_layer_surface_v1::Anchor::Top);
+      layer_surface.set_exclusive_zone(20);
+
+      surface.commit();
+
+      self.layer_surface = Some(layer_surface);
+    }
+  }
 }
 
 impl Dispatch<wl_output::WlOutput, ()> for AppData {
@@ -43,7 +74,7 @@ impl Dispatch<wl_output::WlOutput, ()> for AppData {
     _: &Connection,
     _: &QueueHandle<AppData>,
   ) {
-    let monitor = state.monitors.iter_mut().find(|m| m.id == output.id()).unwrap();
+    let monitor = state.monitors.iter_mut().find(|m| &m.output == output).unwrap();
     match event {
       wl_output::Event::Mode { width, height, .. } => {
         monitor.width = width;
@@ -152,6 +183,32 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for AppData {
   }
 }
 
+impl Dispatch<zwlr_layer_shell_v1::ZwlrLayerShellV1, ()> for AppData {
+  fn event(
+    _state: &mut Self,
+    _shell: &zwlr_layer_shell_v1::ZwlrLayerShellV1,
+    event: zwlr_layer_shell_v1::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<AppData>,
+  ) {
+    println!("layer shell event: {:?}", event);
+  }
+}
+
+impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for AppData {
+  fn event(
+    _state: &mut Self,
+    _shell: &zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
+    event: zwlr_layer_surface_v1::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<AppData>,
+  ) {
+    println!("layer surface event: {:?}", event);
+  }
+}
+
 impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
   fn event(
     state: &mut Self,
@@ -164,32 +221,15 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
     if let wl_registry::Event::Global { name, interface, version } = event {
       if interface == wl_output::WlOutput::interface().name {
         let output = registry.bind::<wl_output::WlOutput, _, _>(name, version, qh, ());
-        state.monitors.push(Monitor { id: output.id(), ..Default::default() });
+        state.monitors.push(Monitor { output, x: 0, y: 0, width: 0, height: 0, scale: 1 });
       } else if interface == wl_compositor::WlCompositor::interface().name {
-        println!("compositor found");
-
         let compositor = registry.bind::<wl_compositor::WlCompositor, _, _>(name, version, qh, ());
         state.surface = Some(compositor.create_surface(qh, ()));
-      } else if interface == xdg_wm_base::XdgWmBase::interface().name {
-        println!("xdg_wm_base found");
-
-        let wm_base = registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, version, qh, ());
-
-        let surface = state.surface.take().unwrap();
-        let xdg_surface = wm_base.get_xdg_surface(&surface, qh, ());
-
-        xdg_surface.get_toplevel(qh, ());
-        xdg_surface.set_window_geometry(50, 50, 100, 100);
-
-        surface.commit();
-
-        println!("created xdg_surface: {:?}", xdg_surface);
-      } else if interface == wl_shm::WlShm::interface().name {
-        // let pool = registry.bind::<wl_shm::WlShm, _, _>(name, version, qh, ());
-        // pool.create_pool(fd, size, qh, udata)
-
-        println!("found an shm pool");
+      } else if interface == zwlr_layer_shell_v1::ZwlrLayerShellV1::interface().name {
+        state.shell = Some(registry.bind(name, version, qh, ()));
       }
+
+      state.on_change(qh);
     }
   }
 }
