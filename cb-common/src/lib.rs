@@ -1,8 +1,23 @@
+use std::collections::HashMap;
+
 pub struct Gpu {
   instance: wgpu::Instance,
   adapter:  wgpu::Adapter,
   device:   wgpu::Device,
   queue:    wgpu::Queue,
+
+  bars: HashMap<BarId, Bar>,
+}
+
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct BarId(u32);
+
+pub struct Bar {
+  surface: wgpu::Surface<'static>,
+}
+
+impl BarId {
+  pub fn new(id: u32) -> Self { BarId(id) }
 }
 
 impl Gpu {
@@ -18,12 +33,12 @@ impl Gpu {
 
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default())).unwrap();
 
-    Gpu { instance, adapter, device, queue }
+    Gpu { instance, adapter, device, queue, bars: HashMap::new() }
   }
 
   pub fn instance(&self) -> &wgpu::Instance { &self.instance }
 
-  pub fn add_surface(&mut self, surface: wgpu::Surface, width: u32, height: u32) {
+  pub fn add_surface(&mut self, id: BarId, surface: wgpu::Surface, width: u32, height: u32) {
     let surface_caps = surface.get_capabilities(&self.adapter);
     // Shader code in this tutorial assumes an sRGB surface texture. Using a
     // different one will result in all the colors coming out darker. If you

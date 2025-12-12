@@ -1,9 +1,8 @@
-use std::ptr::NonNull;
+use std::{collections::HashMap, ptr::NonNull};
 
-use cb_common::Gpu;
+use cb_common::{BarId, Gpu};
 use wayland_client::{
   Connection, Dispatch, Proxy, QueueHandle,
-  backend::ObjectId,
   protocol::{wl_compositor, wl_display, wl_output, wl_registry, wl_shm_pool, wl_surface},
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
@@ -16,7 +15,7 @@ use wgpu::{
 #[derive(Default)]
 struct AppData {
   display:   Option<wl_display::WlDisplay>,
-  monitors:  Vec<Monitor>,
+  monitors:  HashMap<BarId, Monitor>,
   _shm_pool: Option<wl_shm_pool::WlShmPool>,
 
   compositor: Option<wl_compositor::WlCompositor>,
@@ -47,7 +46,7 @@ impl AppData {
     if let Some(shell) = &self.shell
       && let Some(compositor) = &self.compositor
     {
-      for monitor in &mut self.monitors {
+      for (id, monitor) in &mut self.monitors {
         if monitor.surface.is_none() {
           monitor.surface = Some(compositor.create_surface(qh, ()));
         }
@@ -61,7 +60,7 @@ impl AppData {
             zwlr_layer_shell_v1::Layer::Background,
             "foo".into(),
             qh,
-            monitor.output.id(),
+            *id,
           );
 
           layer_surface.set_size(0, 20);
@@ -92,7 +91,7 @@ impl Dispatch<wl_output::WlOutput, ()> for AppData {
     _: &Connection,
     _: &QueueHandle<AppData>,
   ) {
-    let monitor = state.monitors.iter_mut().find(|m| &m.output == output).unwrap();
+    let monitor = state.monitors.values_mut().find(|m| &m.output == output).unwrap();
     match event {
       wl_output::Event::Mode { width, height, .. } => {
         monitor.width = width;
@@ -214,43 +213,39 @@ impl Dispatch<zwlr_layer_shell_v1::ZwlrLayerShellV1, ()> for AppData {
   }
 }
 
-impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ObjectId> for AppData {
+impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarId> for AppData {
   fn event(
     state: &mut Self,
     _shell: &zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
     event: zwlr_layer_surface_v1::Event,
-    output_id: &ObjectId,
+    id: &BarId,
     _: &Connection,
     _: &QueueHandle<AppData>,
   ) {
     match event {
       zwlr_layer_surface_v1::Event::Configure { serial, width, height } => {
-        for monitor in &mut state.monitors {
-          if monitor.output.id() == *output_id {
-            monitor.width = width as i32;
-            monitor.height = height as i32;
-            monitor.layer_surface.as_ref().unwrap().ack_configure(serial);
+        if let Some(monitor) = state.monitors.get_mut(id) {
+          monitor.width = width as i32;
+          monitor.height = height as i32;
+          monitor.layer_surface.as_ref().unwrap().ack_configure(serial);
 
-            unsafe {
-              let raw_display = RawDisplayHandle::Wayland(WaylandDisplayHandle::new(
-                NonNull::new_unchecked(state.display.as_mut().unwrap().id().as_ptr() as *mut _),
-              ));
-              let raw_window = RawWindowHandle::Wayland(WaylandWindowHandle::new(
-                NonNull::new_unchecked(monitor.surface.as_mut().unwrap().id().as_ptr() as *mut _),
-              ));
+          unsafe {
+            let raw_display = RawDisplayHandle::Wayland(WaylandDisplayHandle::new(
+              NonNull::new_unchecked(state.display.as_mut().unwrap().id().as_ptr() as *mut _),
+            ));
+            let raw_window = RawWindowHandle::Wayland(WaylandWindowHandle::new(
+              NonNull::new_unchecked(monitor.surface.as_mut().unwrap().id().as_ptr() as *mut _),
+            ));
 
-              let mut gpu = Gpu::new();
-              let surface = gpu
-                .instance()
-                .create_surface_unsafe(SurfaceTargetUnsafe::RawHandle {
-                  raw_display_handle: raw_display,
-                  raw_window_handle:  raw_window,
-                })
-                .expect("create_surface failed");
-              gpu.add_surface(surface, width, height);
-            }
-
-            break;
+            let mut gpu = Gpu::new();
+            let surface = gpu
+              .instance()
+              .create_surface_unsafe(SurfaceTargetUnsafe::RawHandle {
+                raw_display_handle: raw_display,
+                raw_window_handle:  raw_window,
+              })
+              .expect("create_surface failed");
+            gpu.add_surface(*id, surface, width, height);
           }
         }
       }
@@ -270,16 +265,21 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
   ) {
     if let wl_registry::Event::Global { name, interface, version } = event {
       if interface == wl_output::WlOutput::interface().name {
-        state.monitors.push(Monitor {
-          output:        registry.bind(name, version, qh, ()),
-          surface:       None,
-          layer_surface: None,
-          x:             0,
-          y:             0,
-          width:         0,
-          height:        0,
-          scale:         1,
-        });
+        let id = BarId::new(name);
+
+        state.monitors.insert(
+          id,
+          Monitor {
+            output:        registry.bind(name, version, qh, ()),
+            surface:       None,
+            layer_surface: None,
+            x:             0,
+            y:             0,
+            width:         0,
+            height:        0,
+            scale:         1,
+          },
+        );
       } else if interface == wl_compositor::WlCompositor::interface().name {
         state.compositor = Some(registry.bind(name, version, qh, ()));
       } else if interface == zwlr_layer_shell_v1::ZwlrLayerShellV1::interface().name {
