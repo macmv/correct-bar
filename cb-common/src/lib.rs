@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 
-pub struct Gpu {
+pub struct Gpu<A> {
   instance: wgpu::Instance,
   adapter:  wgpu::Adapter,
   device:   wgpu::Device,
   queue:    wgpu::Queue,
 
   bars: HashMap<BarId, Bar>,
+
+  app: A,
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
@@ -22,12 +24,8 @@ impl BarId {
   pub fn new(id: u32) -> Self { BarId(id) }
 }
 
-impl Default for Gpu {
-  fn default() -> Self { Gpu::new() }
-}
-
-impl Gpu {
-  pub fn new() -> Self {
+impl<A> Gpu<A> {
+  pub fn new(app: A) -> Self {
     let instance = wgpu::Instance::new(&Default::default());
 
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -39,7 +37,7 @@ impl Gpu {
 
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default())).unwrap();
 
-    Gpu { instance, adapter, device, queue, bars: HashMap::new() }
+    Gpu { instance, adapter, device, queue, bars: HashMap::new(), app }
   }
 
   pub fn instance(&self) -> &wgpu::Instance { &self.instance }

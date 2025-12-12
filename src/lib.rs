@@ -6,7 +6,15 @@ pub mod math;
 use bar::Updater;
 use config::Config;
 
+struct App {}
+
+impl App {
+  pub fn new(config: Config) -> Self { App {} }
+}
+
 pub fn run(config: Config) {
+  cb_backend_wayland::setup(App::new(config.clone()));
+
   let bars = backend::wayland::setup(config);
 
   let mut all_modules = vec![];

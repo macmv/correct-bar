@@ -15,9 +15,8 @@ use wgpu::{
   rwh::{RawDisplayHandle, RawWindowHandle, WaylandDisplayHandle, WaylandWindowHandle},
 };
 
-#[derive(Default)]
-struct AppData {
-  gpu: Gpu,
+struct AppData<A> {
+  gpu: Gpu<A>,
 
   display:  Option<wl_display::WlDisplay>,
   monitors: HashMap<BarId, Monitor>,
@@ -46,8 +45,8 @@ struct Monitor {
   scale: i32,
 }
 
-impl AppData {
-  fn on_change(&mut self, qh: &QueueHandle<AppData>) {
+impl<A: 'static> AppData<A> {
+  fn on_change(&mut self, qh: &QueueHandle<AppData<A>>) {
     if let Some(shell) = &self.shell
       && let Some(compositor) = &self.compositor
     {
@@ -87,14 +86,14 @@ impl AppData {
   }
 }
 
-impl Dispatch<wl_output::WlOutput, ()> for AppData {
+impl<A> Dispatch<wl_output::WlOutput, ()> for AppData<A> {
   fn event(
     state: &mut Self,
     output: &wl_output::WlOutput,
     event: wl_output::Event,
     _: &(),
     _: &Connection,
-    _: &QueueHandle<AppData>,
+    _: &QueueHandle<Self>,
   ) {
     let monitor = state.monitors.values_mut().find(|m| &m.output == output).unwrap();
     match event {
@@ -127,40 +126,40 @@ impl Dispatch<wl_output::WlOutput, ()> for AppData {
   }
 }
 
-impl Dispatch<wl_shm_pool::WlShmPool, ()> for AppData {
+impl<A> Dispatch<wl_shm_pool::WlShmPool, ()> for AppData<A> {
   fn event(
     _state: &mut Self,
     _output: &wl_shm_pool::WlShmPool,
     event: wl_shm_pool::Event,
     _: &(),
     _: &Connection,
-    _: &QueueHandle<AppData>,
+    _: &QueueHandle<Self>,
   ) {
     println!("shm pool event: {:?}", event);
   }
 }
 
-impl Dispatch<wl_compositor::WlCompositor, ()> for AppData {
+impl<A> Dispatch<wl_compositor::WlCompositor, ()> for AppData<A> {
   fn event(
     _state: &mut Self,
     _output: &wl_compositor::WlCompositor,
     event: wl_compositor::Event,
     _: &(),
     _: &Connection,
-    _: &QueueHandle<AppData>,
+    _: &QueueHandle<Self>,
   ) {
     println!("compositor event: {:?}", event);
   }
 }
 
-impl Dispatch<wl_surface::WlSurface, BarId> for AppData {
+impl<A> Dispatch<wl_surface::WlSurface, BarId> for AppData<A> {
   fn event(
     state: &mut Self,
     _surface: &wl_surface::WlSurface,
     event: wl_surface::Event,
     id: &BarId,
     _: &Connection,
-    _: &QueueHandle<AppData>,
+    _: &QueueHandle<Self>,
   ) {
     match event {
       wl_surface::Event::PreferredBufferScale { factor } => {
@@ -173,66 +172,66 @@ impl Dispatch<wl_surface::WlSurface, BarId> for AppData {
   }
 }
 
-impl Dispatch<xdg_wm_base::XdgWmBase, ()> for AppData {
+impl<A> Dispatch<xdg_wm_base::XdgWmBase, ()> for AppData<A> {
   fn event(
     _state: &mut Self,
     _surface: &xdg_wm_base::XdgWmBase,
     event: xdg_wm_base::Event,
     _: &(),
     _: &Connection,
-    _: &QueueHandle<AppData>,
+    _: &QueueHandle<Self>,
   ) {
     println!("wm_base event: {:?}", event);
   }
 }
 
-impl Dispatch<xdg_surface::XdgSurface, ()> for AppData {
+impl<A> Dispatch<xdg_surface::XdgSurface, ()> for AppData<A> {
   fn event(
     _state: &mut Self,
     _surface: &xdg_surface::XdgSurface,
     event: xdg_surface::Event,
     _: &(),
     _: &Connection,
-    _: &QueueHandle<AppData>,
+    _: &QueueHandle<Self>,
   ) {
     println!("xdg_surface event: {:?}", event);
   }
 }
 
-impl Dispatch<xdg_toplevel::XdgToplevel, ()> for AppData {
+impl<A> Dispatch<xdg_toplevel::XdgToplevel, ()> for AppData<A> {
   fn event(
     _state: &mut Self,
     _surface: &xdg_toplevel::XdgToplevel,
     event: xdg_toplevel::Event,
     _: &(),
     _: &Connection,
-    _: &QueueHandle<AppData>,
+    _: &QueueHandle<Self>,
   ) {
     println!("xdg_toplevel event: {:?}", event);
   }
 }
 
-impl Dispatch<zwlr_layer_shell_v1::ZwlrLayerShellV1, ()> for AppData {
+impl<A> Dispatch<zwlr_layer_shell_v1::ZwlrLayerShellV1, ()> for AppData<A> {
   fn event(
     _state: &mut Self,
     _shell: &zwlr_layer_shell_v1::ZwlrLayerShellV1,
     event: zwlr_layer_shell_v1::Event,
     _: &(),
     _: &Connection,
-    _: &QueueHandle<AppData>,
+    _: &QueueHandle<Self>,
   ) {
     println!("layer shell event: {:?}", event);
   }
 }
 
-impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarId> for AppData {
+impl<A> Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarId> for AppData<A> {
   fn event(
     state: &mut Self,
     _shell: &zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
     event: zwlr_layer_surface_v1::Event,
     id: &BarId,
     _: &Connection,
-    _: &QueueHandle<AppData>,
+    _: &QueueHandle<Self>,
   ) {
     match event {
       zwlr_layer_surface_v1::Event::Configure { serial, width, height } => {
@@ -270,7 +269,7 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarId> for AppData {
   }
 }
 
-impl Dispatch<wl_callback::WlCallback, BarId> for AppData {
+impl<A> Dispatch<wl_callback::WlCallback, BarId> for AppData<A> {
   fn event(
     state: &mut Self,
     _: &wl_callback::WlCallback,
@@ -284,7 +283,7 @@ impl Dispatch<wl_callback::WlCallback, BarId> for AppData {
   }
 }
 
-impl Dispatch<wl_seat::WlSeat, ()> for AppData {
+impl<A> Dispatch<wl_seat::WlSeat, ()> for AppData<A> {
   fn event(
     _: &mut Self,
     _: &wl_seat::WlSeat,
@@ -297,7 +296,7 @@ impl Dispatch<wl_seat::WlSeat, ()> for AppData {
   }
 }
 
-impl Dispatch<wl_pointer::WlPointer, ()> for AppData {
+impl<A> Dispatch<wl_pointer::WlPointer, ()> for AppData<A> {
   fn event(
     _: &mut Self,
     _: &wl_pointer::WlPointer,
@@ -310,14 +309,14 @@ impl Dispatch<wl_pointer::WlPointer, ()> for AppData {
   }
 }
 
-impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
+impl<A: 'static> Dispatch<wl_registry::WlRegistry, ()> for AppData<A> {
   fn event(
     state: &mut Self,
     registry: &wl_registry::WlRegistry,
     event: wl_registry::Event,
     _: &(),
     _: &Connection,
-    qh: &QueueHandle<AppData>,
+    qh: &QueueHandle<Self>,
   ) {
     if let wl_registry::Event::Global { name, interface, version } = event {
       if interface == wl_output::WlOutput::interface().name {
@@ -350,7 +349,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
   }
 }
 
-pub fn setup() {
+pub fn setup<A: 'static>(app: A) {
   let conn = Connection::connect_to_env().unwrap();
 
   let display = conn.display();
@@ -359,7 +358,14 @@ pub fn setup() {
   let qh = event_queue.handle();
   display.get_registry(&qh, ());
 
-  let mut app = AppData::default();
+  let mut app = AppData {
+    gpu:        Gpu::new(app),
+    monitors:   HashMap::new(),
+    compositor: None,
+    shell:      None,
+    seat:       None,
+    display:    None,
+  };
   app.display = Some(display);
 
   loop {
