@@ -1,5 +1,6 @@
 use wayland_client::{
   Connection, Dispatch, Proxy, QueueHandle,
+  backend::ObjectId,
   protocol::{wl_compositor, wl_output, wl_registry, wl_shm, wl_shm_pool, wl_surface},
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
@@ -52,7 +53,7 @@ impl AppData {
             zwlr_layer_shell_v1::Layer::Background,
             "foo".into(),
             qh,
-            (),
+            monitor.output.id(),
           );
 
           layer_surface.set_size(0, 20);
@@ -205,16 +206,28 @@ impl Dispatch<zwlr_layer_shell_v1::ZwlrLayerShellV1, ()> for AppData {
   }
 }
 
-impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for AppData {
+impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ObjectId> for AppData {
   fn event(
-    _state: &mut Self,
+    state: &mut Self,
     _shell: &zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
     event: zwlr_layer_surface_v1::Event,
-    _: &(),
+    output_id: &ObjectId,
     _: &Connection,
     _: &QueueHandle<AppData>,
   ) {
-    println!("layer surface event: {:?}", event);
+    match event {
+      zwlr_layer_surface_v1::Event::Configure { serial, width, height } => {
+        for monitor in &mut state.monitors {
+          if monitor.output.id() == *output_id {
+            monitor.width = width as i32;
+            monitor.height = height as i32;
+            monitor.layer_surface.as_ref().unwrap().ack_configure(serial);
+            break;
+          }
+        }
+      }
+      _ => {}
+    }
   }
 }
 
