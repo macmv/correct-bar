@@ -12,9 +12,6 @@ crossbeam-channel = "0.5.15"
 parking_lot = "0.12.5"
 rusttype = "0.9.3"
 
-xcb = { version = "1.6.0", optional = true }
-xcb-util-cursor = { version = "0.4.0", optional = true }
-
 wayland-client = { version = "0.31.11", optional = true }
 wayland-protocols = { version = "0.32.9", optional = true, features = ["client"] }
 
@@ -27,6 +24,5 @@ dbus = "0.9.10"
 libpulse-sys = "1.23.0"
 
 [features]
-default = ["x11", "wayland"]
-x11 = ["xcb", "xcb-util-cursor"]
+default = ["wayland"]
 wayland = ["wayland-client", "wayland-protocols"]
