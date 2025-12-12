@@ -3,7 +3,9 @@ use std::{collections::HashMap, ptr::NonNull};
 use cb_common::{BarId, Gpu};
 use wayland_client::{
   Connection, Dispatch, Proxy, QueueHandle,
-  protocol::{wl_compositor, wl_display, wl_output, wl_registry, wl_shm_pool, wl_surface},
+  protocol::{
+    wl_callback, wl_compositor, wl_display, wl_output, wl_registry, wl_shm_pool, wl_surface,
+  },
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
@@ -257,10 +259,27 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarId> for AppData {
             state.gpu.add_surface(*id, surface, width, height);
             state.gpu.draw(*id);
           }
+
+          // TODO: Request a new frame with this:
+          // monitor.surface.as_ref().unwrap().frame(qh, *id);
         }
       }
       _ => {}
     }
+  }
+}
+
+impl Dispatch<wl_callback::WlCallback, BarId> for AppData {
+  fn event(
+    state: &mut Self,
+    _: &wl_callback::WlCallback,
+    _: wl_callback::Event,
+    id: &BarId,
+    _: &Connection,
+    _: &QueueHandle<Self>,
+  ) {
+    println!("drawing!!");
+    state.gpu.draw(*id);
   }
 }
 
