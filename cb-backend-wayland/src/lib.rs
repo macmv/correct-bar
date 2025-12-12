@@ -246,6 +246,7 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarId> for AppData {
               })
               .expect("create_surface failed");
             gpu.add_surface(*id, surface, width, height);
+            gpu.draw(*id);
           }
         }
       }

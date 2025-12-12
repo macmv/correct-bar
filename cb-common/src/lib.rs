@@ -37,8 +37,16 @@ impl Gpu {
   }
 
   pub fn instance(&self) -> &wgpu::Instance { &self.instance }
+  pub fn bar(&self, id: BarId) -> Option<&Bar> { self.bars.get(&id) }
+  pub fn bar_mut(&mut self, id: BarId) -> Option<&mut Bar> { self.bars.get_mut(&id) }
 
-  pub fn add_surface(&mut self, id: BarId, surface: wgpu::Surface, width: u32, height: u32) {
+  pub fn add_surface(
+    &mut self,
+    id: BarId,
+    surface: wgpu::Surface<'static>,
+    width: u32,
+    height: u32,
+  ) {
     let surface_caps = surface.get_capabilities(&self.adapter);
     // Shader code in this tutorial assumes an sRGB surface texture. Using a
     // different one will result in all the colors coming out darker. If you
@@ -59,7 +67,11 @@ impl Gpu {
 
     surface.configure(&self.device, &config);
 
-    let output = surface.get_current_texture().unwrap();
+    self.bars.insert(id, Bar { surface });
+  }
+
+  pub fn draw(&self, id: BarId) {
+    let output = self.bars.get(&id).unwrap().surface.get_current_texture().unwrap();
 
     let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
