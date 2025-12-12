@@ -247,7 +247,7 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ObjectId> for AppData {
                   raw_window_handle:  raw_window,
                 })
                 .expect("create_surface failed");
-              gpu.add_surface(surface);
+              gpu.add_surface(surface, width, height);
             }
 
             break;
