@@ -1,13 +1,21 @@
+use std::ptr::NonNull;
+
+use cb_common::Gpu;
 use wayland_client::{
   Connection, Dispatch, Proxy, QueueHandle,
   backend::ObjectId,
-  protocol::{wl_compositor, wl_output, wl_registry, wl_shm, wl_shm_pool, wl_surface},
+  protocol::{wl_compositor, wl_display, wl_output, wl_registry, wl_shm_pool, wl_surface},
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
+use wgpu::{
+  SurfaceTargetUnsafe,
+  rwh::{RawDisplayHandle, RawWindowHandle, WaylandDisplayHandle, WaylandWindowHandle},
+};
 
 #[derive(Default)]
 struct AppData {
+  display:   Option<wl_display::WlDisplay>,
   monitors:  Vec<Monitor>,
   _shm_pool: Option<wl_shm_pool::WlShmPool>,
 
@@ -222,6 +230,26 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ObjectId> for AppData {
             monitor.width = width as i32;
             monitor.height = height as i32;
             monitor.layer_surface.as_ref().unwrap().ack_configure(serial);
+
+            unsafe {
+              let raw_display = RawDisplayHandle::Wayland(WaylandDisplayHandle::new(
+                NonNull::new_unchecked(state.display.as_mut().unwrap().id().as_ptr() as *mut _),
+              ));
+              let raw_window = RawWindowHandle::Wayland(WaylandWindowHandle::new(
+                NonNull::new_unchecked(monitor.surface.as_mut().unwrap().id().as_ptr() as *mut _),
+              ));
+
+              let mut gpu = Gpu::new();
+              let surface = gpu
+                .instance()
+                .create_surface_unsafe(SurfaceTargetUnsafe::RawHandle {
+                  raw_display_handle: raw_display,
+                  raw_window_handle:  raw_window,
+                })
+                .expect("create_surface failed");
+              gpu.add_surface(surface);
+            }
+
             break;
           }
         }
@@ -273,6 +301,7 @@ pub fn setup() {
   display.get_registry(&qh, ());
 
   let mut app = AppData::default();
+  app.display = Some(display);
 
   loop {
     event_queue.roundtrip(&mut app).unwrap();
