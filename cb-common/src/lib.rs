@@ -14,10 +14,16 @@ pub struct BarId(u32);
 
 pub struct Bar {
   surface: wgpu::Surface<'static>,
+
+  pub scale: f32,
 }
 
 impl BarId {
   pub fn new(id: u32) -> Self { BarId(id) }
+}
+
+impl Default for Gpu {
+  fn default() -> Self { Gpu::new() }
 }
 
 impl Gpu {
@@ -67,7 +73,7 @@ impl Gpu {
 
     surface.configure(&self.device, &config);
 
-    self.bars.insert(id, Bar { surface });
+    self.bars.insert(id, Bar { surface, scale: 1.0 });
   }
 
   pub fn draw(&self, id: BarId) {

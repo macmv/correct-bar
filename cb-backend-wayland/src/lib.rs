@@ -14,6 +14,8 @@ use wgpu::{
 
 #[derive(Default)]
 struct AppData {
+  gpu: Gpu,
+
   display:   Option<wl_display::WlDisplay>,
   monitors:  HashMap<BarId, Monitor>,
   _shm_pool: Option<wl_shm_pool::WlShmPool>,
@@ -48,7 +50,7 @@ impl AppData {
     {
       for (id, monitor) in &mut self.monitors {
         if monitor.surface.is_none() {
-          monitor.surface = Some(compositor.create_surface(qh, ()));
+          monitor.surface = Some(compositor.create_surface(qh, *id));
         }
 
         if monitor.layer_surface.is_none() {
@@ -148,16 +150,23 @@ impl Dispatch<wl_compositor::WlCompositor, ()> for AppData {
   }
 }
 
-impl Dispatch<wl_surface::WlSurface, ()> for AppData {
+impl Dispatch<wl_surface::WlSurface, BarId> for AppData {
   fn event(
-    _state: &mut Self,
+    state: &mut Self,
     _surface: &wl_surface::WlSurface,
     event: wl_surface::Event,
-    _: &(),
+    id: &BarId,
     _: &Connection,
     _: &QueueHandle<AppData>,
   ) {
-    println!("surface event: {:?}", event);
+    match event {
+      wl_surface::Event::PreferredBufferScale { factor } => {
+        state.gpu.bar_mut(*id).unwrap().scale = factor as f32;
+      }
+      _ => {
+        println!("surface event: {:?}", event);
+      }
+    }
   }
 }
 
@@ -237,16 +246,16 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarId> for AppData {
               NonNull::new_unchecked(monitor.surface.as_mut().unwrap().id().as_ptr() as *mut _),
             ));
 
-            let mut gpu = Gpu::new();
-            let surface = gpu
+            let surface = state
+              .gpu
               .instance()
               .create_surface_unsafe(SurfaceTargetUnsafe::RawHandle {
                 raw_display_handle: raw_display,
                 raw_window_handle:  raw_window,
               })
               .expect("create_surface failed");
-            gpu.add_surface(*id, surface, width, height);
-            gpu.draw(*id);
+            state.gpu.add_surface(*id, surface, width, height);
+            state.gpu.draw(*id);
           }
         }
       }
