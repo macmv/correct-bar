@@ -8,23 +8,23 @@ edition = "2021"
 [lib]
 
 [dependencies]
-crossbeam-channel = "0.5.6"
-parking_lot = "0.12.1"
+crossbeam-channel = "0.5.15"
+parking_lot = "0.12.5"
 rusttype = "0.9.3"
 
-xcb = { version = "1.2.0", optional = true }
-xcb-util-cursor = { version = "0.3.2", optional = true }
+xcb = { version = "1.6.0", optional = true }
+xcb-util-cursor = { version = "0.4.0", optional = true }
 
-wayland-client = { version = "0.31.3", optional = true }
-wayland-protocols = { version = "0.32.1", optional = true, features = ["client"] }
+wayland-client = { version = "0.31.11", optional = true }
+wayland-protocols = { version = "0.32.9", optional = true, features = ["client"] }
 
 [dev-dependencies]
 alsa-sys = "0.3.1"
-chrono = "0.4.22"
-serde = { version = "1.0.147", features = ["derive"] }
-serde_json = "1.0.87"
-dbus = "0.9.7"
-libpulse-sys = "1.21.0"
+chrono = "0.4.42"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+dbus = "0.9.10"
+libpulse-sys = "1.23.0"
 
 [features]
 default = ["x11", "wayland"]
