@@ -19,9 +19,8 @@ use wgpu::{
 struct AppData {
   gpu: Gpu,
 
-  display:   Option<wl_display::WlDisplay>,
-  monitors:  HashMap<BarId, Monitor>,
-  _shm_pool: Option<wl_shm_pool::WlShmPool>,
+  display:  Option<wl_display::WlDisplay>,
+  monitors: HashMap<BarId, Monitor>,
 
   compositor: Option<wl_compositor::WlCompositor>,
   seat:       Option<wl_seat::WlSeat>,
