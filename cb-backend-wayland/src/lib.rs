@@ -4,7 +4,8 @@ use cb_common::{BarId, Gpu};
 use wayland_client::{
   Connection, Dispatch, Proxy, QueueHandle,
   protocol::{
-    wl_callback, wl_compositor, wl_display, wl_output, wl_registry, wl_shm_pool, wl_surface,
+    wl_callback, wl_compositor, wl_display, wl_output, wl_pointer, wl_registry, wl_seat,
+    wl_shm_pool, wl_surface,
   },
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
@@ -23,6 +24,7 @@ struct AppData {
   _shm_pool: Option<wl_shm_pool::WlShmPool>,
 
   compositor: Option<wl_compositor::WlCompositor>,
+  seat:       Option<wl_seat::WlSeat>,
   shell:      Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
 }
 
@@ -283,6 +285,32 @@ impl Dispatch<wl_callback::WlCallback, BarId> for AppData {
   }
 }
 
+impl Dispatch<wl_seat::WlSeat, ()> for AppData {
+  fn event(
+    _: &mut Self,
+    _: &wl_seat::WlSeat,
+    event: wl_seat::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<Self>,
+  ) {
+    println!("seat: {event:?}");
+  }
+}
+
+impl Dispatch<wl_pointer::WlPointer, ()> for AppData {
+  fn event(
+    _: &mut Self,
+    _: &wl_pointer::WlPointer,
+    _: wl_pointer::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<Self>,
+  ) {
+    // println!("pointer: {event:?}");
+  }
+}
+
 impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
   fn event(
     state: &mut Self,
@@ -311,6 +339,9 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
         );
       } else if interface == wl_compositor::WlCompositor::interface().name {
         state.compositor = Some(registry.bind(name, version, qh, ()));
+      } else if interface == wl_seat::WlSeat::interface().name {
+        state.seat = Some(registry.bind(name, version, qh, ()));
+        state.seat.as_ref().unwrap().get_pointer(qh, ());
       } else if interface == zwlr_layer_shell_v1::ZwlrLayerShellV1::interface().name {
         state.shell = Some(registry.bind(name, version, qh, ()));
       }
