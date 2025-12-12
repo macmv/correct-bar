@@ -12,8 +12,8 @@ use crate::{bar::Bar, config::Config};
 
 #[derive(Default)]
 struct AppData {
-  monitors: Vec<Monitor>,
-  shm_pool: Option<wl_shm_pool::WlShmPool>,
+  monitors:  Vec<Monitor>,
+  _shm_pool: Option<wl_shm_pool::WlShmPool>,
 
   // FIXME: This needs to be per-bar.
   surface: Option<wl_surface::WlSurface>,
@@ -81,8 +81,8 @@ impl Dispatch<wl_output::WlOutput, ()> for AppData {
 
 impl Dispatch<wl_shm_pool::WlShmPool, ()> for AppData {
   fn event(
-    state: &mut Self,
-    output: &wl_shm_pool::WlShmPool,
+    _state: &mut Self,
+    _output: &wl_shm_pool::WlShmPool,
     event: wl_shm_pool::Event,
     _: &(),
     _: &Connection,
@@ -94,8 +94,8 @@ impl Dispatch<wl_shm_pool::WlShmPool, ()> for AppData {
 
 impl Dispatch<wl_compositor::WlCompositor, ()> for AppData {
   fn event(
-    state: &mut Self,
-    output: &wl_compositor::WlCompositor,
+    _state: &mut Self,
+    _output: &wl_compositor::WlCompositor,
     event: wl_compositor::Event,
     _: &(),
     _: &Connection,
@@ -107,8 +107,8 @@ impl Dispatch<wl_compositor::WlCompositor, ()> for AppData {
 
 impl Dispatch<wl_surface::WlSurface, ()> for AppData {
   fn event(
-    state: &mut Self,
-    surface: &wl_surface::WlSurface,
+    _state: &mut Self,
+    _surface: &wl_surface::WlSurface,
     event: wl_surface::Event,
     _: &(),
     _: &Connection,
@@ -120,8 +120,8 @@ impl Dispatch<wl_surface::WlSurface, ()> for AppData {
 
 impl Dispatch<xdg_wm_base::XdgWmBase, ()> for AppData {
   fn event(
-    state: &mut Self,
-    surface: &xdg_wm_base::XdgWmBase,
+    _state: &mut Self,
+    _surface: &xdg_wm_base::XdgWmBase,
     event: xdg_wm_base::Event,
     _: &(),
     _: &Connection,
@@ -133,8 +133,8 @@ impl Dispatch<xdg_wm_base::XdgWmBase, ()> for AppData {
 
 impl Dispatch<xdg_surface::XdgSurface, ()> for AppData {
   fn event(
-    state: &mut Self,
-    surface: &xdg_surface::XdgSurface,
+    _state: &mut Self,
+    _surface: &xdg_surface::XdgSurface,
     event: xdg_surface::Event,
     _: &(),
     _: &Connection,
@@ -146,8 +146,8 @@ impl Dispatch<xdg_surface::XdgSurface, ()> for AppData {
 
 impl Dispatch<xdg_toplevel::XdgToplevel, ()> for AppData {
   fn event(
-    state: &mut Self,
-    surface: &xdg_toplevel::XdgToplevel,
+    _state: &mut Self,
+    _surface: &xdg_toplevel::XdgToplevel,
     event: xdg_toplevel::Event,
     _: &(),
     _: &Connection,
@@ -199,7 +199,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for AppData {
   }
 }
 
-pub fn setup(config: Config) -> Vec<Arc<Mutex<Bar>>> {
+pub fn setup(_config: Config) -> Vec<Arc<Mutex<Bar>>> {
   let conn = Connection::connect_to_env().unwrap();
 
   let display = conn.display();
