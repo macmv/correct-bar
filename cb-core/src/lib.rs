@@ -5,7 +5,7 @@ use kurbo::Stroke;
 use parley::{FontContext, LayoutContext};
 use peniko::{
   Brush, Color, Gradient,
-  color::{AlphaColor, Oklch, OpaqueColor, Srgb, palette},
+  color::{AlphaColor, Oklch, OpaqueColor, Srgb},
 };
 use vello::{RenderParams, Scene};
 use wgpu::util::TextureBlitter;
