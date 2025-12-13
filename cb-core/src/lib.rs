@@ -111,7 +111,7 @@ impl Render<'_> {
         &self.scene,
         &bar.texture_view,
         &RenderParams {
-          base_color:          Color::from_rgba8(0, 0, 0, 0),
+          base_color:          Color::from_rgba8(16, 16, 16, 192),
           width:               bar.texture.width(),
           height:              bar.texture.height(),
           antialiasing_method: vello::AaConfig::Msaa16,
