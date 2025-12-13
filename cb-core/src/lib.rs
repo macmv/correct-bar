@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cb_common::BarId;
 use parley::{FontContext, LayoutContext};
 use peniko::color::palette;
-use vello::{RenderParams, Scene};
+use vello::{RenderParams, Scene, util::RenderSurface};
 
 pub struct RenderStore {
   font:   FontContext,
@@ -15,6 +15,8 @@ pub struct RenderStore {
 }
 
 struct Bar {
+  surface: RenderSurface<'static>,
+
   texture:      wgpu::Texture,
   texture_view: wgpu::TextureView,
 }
@@ -35,10 +37,20 @@ impl RenderStore {
       bars:   HashMap::new(),
     }
   }
+
+  pub fn for_bar(&mut self, id: BarId) -> Option<Render<'_>> {
+    if self.bars.contains_key(&id) {
+      Some(Render { bar: id, store: self, scene: Scene::new() })
+    } else {
+      None
+    }
+  }
 }
 
 impl Render<'_> {
-  pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
+  pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Texture) {
+    let bar = &self.store.bars[&self.bar];
+
     self
       .store
       .render
@@ -46,14 +58,25 @@ impl Render<'_> {
         device,
         queue,
         &self.scene,
-        &self.store.bars[&self.bar].texture_view,
+        &bar.texture_view,
         &RenderParams {
           base_color:          palette::css::BLACK,
-          width:               self.store.bars[&self.bar].texture.width(),
-          height:              self.store.bars[&self.bar].texture.height(),
+          width:               bar.texture.width(),
+          height:              bar.texture.height(),
           antialiasing_method: vello::AaConfig::Msaa16,
         },
       )
       .unwrap();
+
+    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
+    bar.surface.blitter.copy(
+      device,
+      &mut encoder,
+      &bar.texture_view,
+      &surface.create_view(&wgpu::TextureViewDescriptor::default()),
+    );
+
+    // submit will accept anything that implements IntoIter
+    queue.submit(std::iter::once(encoder.finish()));
   }
 }

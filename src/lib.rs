@@ -4,6 +4,7 @@ pub mod config;
 pub mod math;
 
 use bar::Updater;
+use cb_common::BarId;
 use config::Config;
 
 use crate::bar::Module;
@@ -28,7 +29,18 @@ impl cb_common::App for App {
       render: cb_core::RenderStore::new(device),
     }
   }
-  fn draw(&mut self) {}
+
+  fn draw(
+    &mut self,
+    id: BarId,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    output: &wgpu::Texture,
+  ) {
+    if let Some(mut render) = self.render.for_bar(id) {
+      render.draw(device, queue, output);
+    }
+  }
 }
 
 pub fn run(config: Config) {
