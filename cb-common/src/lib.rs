@@ -73,8 +73,13 @@ impl<A: App> Gpu<A> {
     // different one will result in all the colors coming out darker. If you
     // want to support non sRGB surfaces, you'll need to account for that when
     // drawing to the frame.
-    let surface_format =
-      surface_caps.formats.iter().find(|f| f.is_srgb()).copied().unwrap_or(surface_caps.formats[0]);
+    let surface_format = surface_caps
+      .formats
+      .iter()
+      .find(|f| !f.is_srgb())
+      .copied()
+      .expect("sRGB surface not supported");
+
     let config = wgpu::SurfaceConfiguration {
       usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
       format: surface_format,
@@ -89,7 +94,6 @@ impl<A: App> Gpu<A> {
     surface.configure(&self.device, &config);
 
     self.bars.insert(id, Bar { surface, scale: 1.0 });
-
     self.app.create_bar(id, &self.device, surface_format, width, height);
   }
 
