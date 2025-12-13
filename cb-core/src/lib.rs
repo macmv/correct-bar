@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use cb_common::BarId;
+use kurbo::Stroke;
 use parley::{FontContext, LayoutContext};
 use peniko::{
-  Color,
-  color::{AlphaColor, Oklch, OpaqueColor, palette},
+  Brush, Color, Gradient,
+  color::{AlphaColor, Oklch, OpaqueColor, Srgb, palette},
 };
 use vello::{RenderParams, Scene};
 use wgpu::util::TextureBlitter;
@@ -64,7 +65,9 @@ impl RenderStore {
     });
     let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-    let blitter = TextureBlitter::new(&device, surface_format);
+    let blitter = wgpu::util::TextureBlitterBuilder::new(&device, surface_format)
+      .blend_state(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING)
+      .build();
 
     self.bars.insert(id, Bar { scale, texture, texture_view, blitter });
   }
@@ -82,12 +85,21 @@ impl Render<'_> {
   pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Texture) {
     let bar = &self.store.bars[&self.bar];
 
-    self.scene.fill(
-      peniko::Fill::NonZero,
+    fn oklch(l: f32, c: f32, h: f32) -> AlphaColor<Srgb> {
+      OpaqueColor::<Oklch>::new([l, c, h]).to_rgba8().into()
+    }
+
+    let start = oklch(0.6, 0.1529, 259.41);
+    let end = oklch(0.6, 0.1801, 283.76);
+    let brush =
+      Brush::Gradient(Gradient::new_linear((10.0, 5.0), (15.0, 15.0)).with_stops([start, end]));
+
+    self.scene.stroke(
+      &Stroke::new(5.0),
       kurbo::Affine::scale(bar.scale.into()),
-      Color::from_rgb8(55, 55, 55),
+      &brush,
       None,
-      &kurbo::Rect::new(5.0, 5.0, 15.0, 15.0),
+      &kurbo::RoundedRect::new(5.0, 5.0, 60.0, 30.0, 8.0),
     );
 
     self

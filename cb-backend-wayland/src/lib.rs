@@ -67,7 +67,7 @@ impl<A: cb_common::App + 'static> AppData<A> {
             *id,
           );
 
-          layer_surface.set_size(0, 20);
+          layer_surface.set_size(0, 40);
           layer_surface.set_anchor(
             zwlr_layer_surface_v1::Anchor::Top
               | zwlr_layer_surface_v1::Anchor::Left
