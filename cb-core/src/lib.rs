@@ -95,11 +95,11 @@ impl Render<'_> {
       Brush::Gradient(Gradient::new_linear((10.0, 5.0), (15.0, 15.0)).with_stops([start, end]));
 
     self.scene.stroke(
-      &Stroke::new(5.0),
+      &Stroke::new(2.0),
       kurbo::Affine::scale(bar.scale.into()),
       &brush,
       None,
-      &kurbo::RoundedRect::new(5.0, 5.0, 60.0, 30.0, 8.0),
+      &kurbo::RoundedRect::new(5.0, 5.0, 60.0, 28.0, 6.0),
     );
 
     self
