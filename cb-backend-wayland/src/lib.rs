@@ -74,7 +74,7 @@ impl<A: cb_common::App + 'static> AppData<A> {
           );
           layer_surface.set_margin(0, 0, 0, 0);
           layer_surface.set_exclusive_edge(zwlr_layer_surface_v1::Anchor::Top);
-          layer_surface.set_exclusive_zone(20);
+          layer_surface.set_exclusive_zone(30);
 
           surface.commit();
 

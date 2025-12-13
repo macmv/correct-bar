@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use cb_common::BarId;
-use kurbo::{Point, Rect, Stroke};
+use kurbo::{Point, Shape, Stroke};
 use parley::{FontContext, LayoutContext};
 use peniko::{
   Brush, Color, Gradient,
@@ -117,19 +117,24 @@ impl Render<'_> {
       OpaqueColor::<Oklch>::new([l, c, h]).to_rgba8().into()
     }
 
-    let start = oklch(0.6, 0.1529, 259.41);
-    let end = oklch(0.6, 0.1801, 283.76);
-    let brush = Brush::Gradient(
-      Gradient::new_linear(bar.cursor.unwrap_or((10.0, 5.0).into()), (15.0, 15.0))
-        .with_stops([start, end]),
-    );
+    let rect = kurbo::RoundedRect::new(5.0, 5.0, 60.0, 28.0, 6.0);
+
+    let brush = if let Some(cursor) = bar.cursor
+      && rect.contains(cursor)
+    {
+      let start = oklch(0.6, 0.1529, 259.41);
+      let end = oklch(0.6, 0.1801, 283.76);
+      Brush::Gradient(Gradient::new_linear(cursor, (15.0, 15.0)).with_stops([start, end]))
+    } else {
+      oklch(0.6, 0.0, 0.0).into()
+    };
 
     self.scene.stroke(
       &Stroke::new(2.0),
       kurbo::Affine::scale(bar.scale.into()),
       &brush,
       None,
-      &kurbo::RoundedRect::new(5.0, 5.0, 60.0, 28.0, 6.0),
+      &rect,
     );
 
     self
