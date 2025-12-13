@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 pollster = "0.4.0"
-wgpu = "27.0.1"
+wgpu = "26.0.1"
