@@ -24,6 +24,8 @@ struct AppData<A> {
   compositor: Option<wl_compositor::WlCompositor>,
   seat:       Option<wl_seat::WlSeat>,
   shell:      Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
+
+  pointer_surface: Option<wl_surface::WlSurface>,
 }
 
 #[derive(Debug)]
@@ -300,16 +302,52 @@ impl<A> Dispatch<wl_seat::WlSeat, ()> for AppData<A> {
   }
 }
 
-impl<A> Dispatch<wl_pointer::WlPointer, ()> for AppData<A> {
+impl<A: cb_common::App> Dispatch<wl_pointer::WlPointer, ()> for AppData<A> {
   fn event(
-    _: &mut Self,
+    state: &mut Self,
     _: &wl_pointer::WlPointer,
-    _: wl_pointer::Event,
+    event: wl_pointer::Event,
     _: &(),
     _: &Connection,
     _: &QueueHandle<Self>,
   ) {
-    // println!("pointer: {event:?}");
+    match event {
+      wl_pointer::Event::Enter { surface, surface_x, surface_y, .. } => {
+        state.pointer_surface = Some(surface);
+        if let Some(bar) = state.pointer_bar() {
+          state.gpu.move_mouse(bar, Some((surface_x, surface_y)));
+        }
+      }
+      wl_pointer::Event::Leave { .. } => {
+        if let Some(bar) = state.pointer_bar() {
+          state.gpu.move_mouse(bar, None);
+        }
+
+        state.pointer_surface = None;
+      }
+
+      wl_pointer::Event::Motion { surface_x, surface_y, .. } => {
+        if let Some(bar) = state.pointer_bar() {
+          state.gpu.move_mouse(bar, Some((surface_x, surface_y)));
+        }
+      }
+
+      _ => {}
+    }
+  }
+}
+
+impl<A: cb_common::App> AppData<A> {
+  fn pointer_bar(&mut self) -> Option<BarId> {
+    let surface = self.pointer_surface.as_ref()?;
+
+    for (id, m) in &self.monitors {
+      if m.surface.as_ref().is_some_and(|m| surface == m) {
+        return Some(*id);
+      }
+    }
+
+    None
   }
 }
 
@@ -363,12 +401,13 @@ pub fn setup<A: cb_common::App + 'static>(config: A::Config) {
   display.get_registry(&qh, ());
 
   let mut app = AppData {
-    gpu:        Gpu::<A>::new(config),
-    monitors:   HashMap::new(),
-    compositor: None,
-    shell:      None,
-    seat:       None,
-    display:    None,
+    gpu:             Gpu::<A>::new(config),
+    monitors:        HashMap::new(),
+    compositor:      None,
+    shell:           None,
+    seat:            None,
+    display:         None,
+    pointer_surface: None,
   };
   app.display = Some(display);
 

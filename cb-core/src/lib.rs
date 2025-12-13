@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use cb_common::BarId;
-use kurbo::Stroke;
+use kurbo::{Point, Rect, Stroke};
 use parley::{FontContext, LayoutContext};
 use peniko::{
   Brush, Color, Gradient,
@@ -24,10 +24,13 @@ struct Bar {
   blitter:      TextureBlitter,
   texture:      wgpu::Texture,
   texture_view: wgpu::TextureView,
+
+  cursor: Option<Point>,
 }
 
 pub struct Render<'a> {
-  bar: BarId,
+  bar:    BarId,
+  cursor: Option<Point>,
 
   store: &'a mut RenderStore,
   scene: Scene,
@@ -69,15 +72,19 @@ impl RenderStore {
       .blend_state(wgpu::BlendState::ALPHA_BLENDING)
       .build();
 
-    self.bars.insert(id, Bar { scale, texture, texture_view, blitter });
+    self.bars.insert(id, Bar { scale, texture, texture_view, blitter, cursor: None });
   }
 
   pub fn for_bar(&mut self, id: BarId) -> Option<Render<'_>> {
-    if self.bars.contains_key(&id) {
-      Some(Render { bar: id, store: self, scene: Scene::new() })
+    if let Some(bar) = self.bars.get(&id) {
+      Some(Render { bar: id, cursor: bar.cursor, store: self, scene: Scene::new() })
     } else {
       None
     }
+  }
+
+  pub fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) {
+    self.bars.get_mut(&id).unwrap().cursor = pos.map(|(x, y)| Point::new(x as f64, y as f64));
   }
 }
 
@@ -91,8 +98,10 @@ impl Render<'_> {
 
     let start = oklch(0.6, 0.1529, 259.41);
     let end = oklch(0.6, 0.1801, 283.76);
-    let brush =
-      Brush::Gradient(Gradient::new_linear((10.0, 5.0), (15.0, 15.0)).with_stops([start, end]));
+    let brush = Brush::Gradient(
+      Gradient::new_linear(bar.cursor.unwrap_or((10.0, 5.0).into()), (15.0, 15.0))
+        .with_stops([start, end]),
+    );
 
     self.scene.stroke(
       &Stroke::new(2.0),

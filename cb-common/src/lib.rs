@@ -24,6 +24,7 @@ pub trait App {
     width: u32,
     height: u32,
   );
+  fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>);
   fn draw(&mut self, id: BarId, device: &wgpu::Device, queue: &wgpu::Queue, output: &wgpu::Texture);
 }
 
@@ -102,6 +103,8 @@ impl<A: App> Gpu<A> {
     self.bars.insert(id, Bar { surface, scale });
     self.app.create_bar(id, &self.device, surface_format, scale, width, height);
   }
+
+  pub fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) { self.app.move_mouse(id, pos); }
 
   pub fn draw(&mut self, id: BarId) {
     let output = self.bars.get(&id).unwrap().surface.get_current_texture().unwrap();

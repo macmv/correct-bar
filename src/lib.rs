@@ -42,6 +42,8 @@ impl cb_common::App for App {
     self.render.create_bar(id, device, format, scale, width, height);
   }
 
+  fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) { self.render.move_mouse(id, pos); }
+
   fn draw(
     &mut self,
     id: BarId,
