@@ -30,6 +30,17 @@ impl cb_common::App for App {
     }
   }
 
+  fn create_bar(
+    &mut self,
+    id: BarId,
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    width: u32,
+    height: u32,
+  ) {
+    self.render.create_bar(id, device, format, width, height);
+  }
+
   fn draw(
     &mut self,
     id: BarId,

@@ -15,6 +15,14 @@ pub trait App {
   type Config;
 
   fn new(config: Self::Config, device: &wgpu::Device) -> Self;
+  fn create_bar(
+    &mut self,
+    id: BarId,
+    device: &wgpu::Device,
+    format: wgpu::TextureFormat,
+    width: u32,
+    height: u32,
+  );
   fn draw(&mut self, id: BarId, device: &wgpu::Device, queue: &wgpu::Queue, output: &wgpu::Texture);
 }
 
@@ -81,6 +89,8 @@ impl<A: App> Gpu<A> {
     surface.configure(&self.device, &config);
 
     self.bars.insert(id, Bar { surface, scale: 1.0 });
+
+    self.app.create_bar(id, &self.device, surface_format, width, height);
   }
 
   pub fn draw(&mut self, id: BarId) {
