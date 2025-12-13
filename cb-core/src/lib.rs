@@ -126,13 +126,25 @@ impl Render<'_> {
     let mut quad = Quad::from(rect);
 
     let brush = if let Some(cursor) = bar.cursor
-      && rect.inflate(5.0, 5.0).contains(cursor)
+      && rect.contains(cursor)
     {
       quad = Quad::new_tilted(rect, cursor, 12_f64.to_radians(), 100.0);
 
       let start = oklch(0.6, 0.1529, 259.41);
       let end = oklch(0.6, 0.1801, 283.76);
       Brush::Gradient(Gradient::new_linear(cursor, rect.center()).with_stops([start, end]))
+    } else if let Some(cursor) = bar.cursor {
+      let dx = (rect.x0 - cursor.x).max(cursor.x - rect.x1).max(0.0);
+      let dy = (rect.y0 - cursor.y).max(cursor.y - rect.y1).max(0.0);
+      let dist = (dx * dx + dy * dy).sqrt();
+
+      if dist < 20.0 {
+        let weight = (20.0 - dist) / 20.0;
+
+        quad = Quad::new_tilted(rect, cursor, 12_f64.to_radians() * weight, 100.0);
+      }
+
+      oklch(0.6, 0.0, 0.0).into()
     } else {
       oklch(0.6, 0.0, 0.0).into()
     };
