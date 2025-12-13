@@ -42,9 +42,6 @@ struct Monitor {
   // Logical width/height.
   width:  i32,
   height: i32,
-
-  // Physical scale factor. TODO: f32?
-  scale: i32,
 }
 
 impl<A: cb_common::App + 'static> AppData<A> {
@@ -102,23 +99,10 @@ impl<A> Dispatch<wl_output::WlOutput, ()> for AppData<A> {
       wl_output::Event::Mode { width, height, .. } => {
         monitor.width = width;
         monitor.height = height;
-        if monitor.scale != 0 {
-          // The geometry sends logical coordinates, and mode sends physical size. So only
-          // divide the size here.
-          monitor.width /= monitor.scale;
-          monitor.height /= monitor.scale;
-        }
       }
       wl_output::Event::Geometry { x, y, .. } => {
         monitor.x = x;
         monitor.y = y;
-      }
-      wl_output::Event::Scale { factor } => {
-        monitor.scale = factor;
-        if monitor.width != 0 {
-          monitor.width /= factor;
-          monitor.height /= factor;
-        }
       }
       wl_output::Event::Done => {
         println!("monitors: {:?}", state.monitors);
@@ -157,7 +141,7 @@ impl<A> Dispatch<wl_compositor::WlCompositor, ()> for AppData<A> {
 impl<A: cb_common::App> Dispatch<wl_surface::WlSurface, BarId> for AppData<A> {
   fn event(
     state: &mut Self,
-    _surface: &wl_surface::WlSurface,
+    surface: &wl_surface::WlSurface,
     event: wl_surface::Event,
     id: &BarId,
     _: &Connection,
@@ -165,7 +149,14 @@ impl<A: cb_common::App> Dispatch<wl_surface::WlSurface, BarId> for AppData<A> {
   ) {
     match event {
       wl_surface::Event::PreferredBufferScale { factor } => {
-        state.gpu.bar_mut(*id).unwrap().scale = factor as f32;
+        let bar = state.gpu.bar_mut(*id).unwrap();
+        if bar.scale != factor as f32 {
+          bar.scale = factor as f32;
+
+          surface.set_buffer_scale(factor);
+          surface.commit();
+          state.gpu.draw(*id);
+        }
       }
       _ => {
         println!("surface event: {:?}", event);
@@ -256,13 +247,7 @@ impl<A: cb_common::App> Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarI
                 raw_window_handle:  raw_window,
               })
               .expect("create_surface failed");
-            state.gpu.add_surface(
-              *id,
-              surface,
-              monitor.scale as f32,
-              width * monitor.scale as u32,
-              height * monitor.scale as u32,
-            );
+            state.gpu.add_surface(*id, surface, 1.0, width, height);
             state.gpu.draw(*id);
           }
 
@@ -374,7 +359,6 @@ impl<A: cb_common::App + 'static> Dispatch<wl_registry::WlRegistry, ()> for AppD
             y:             0,
             width:         0,
             height:        0,
-            scale:         1,
           },
         );
       } else if interface == wl_compositor::WlCompositor::interface().name {

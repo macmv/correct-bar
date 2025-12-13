@@ -104,7 +104,10 @@ impl<A: App> Gpu<A> {
     self.app.create_bar(id, &self.device, surface_format, scale, width, height);
   }
 
-  pub fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) { self.app.move_mouse(id, pos); }
+  pub fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) {
+    self.app.move_mouse(id, pos);
+    self.draw(id);
+  }
 
   pub fn draw(&mut self, id: BarId) {
     let output = self.bars.get(&id).unwrap().surface.get_current_texture().unwrap();
