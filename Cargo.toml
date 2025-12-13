@@ -33,4 +33,5 @@ wayland = ["wayland-client", "wayland-protocols"]
 members = [
   "cb-common",
   "cb-backend-wayland",
+  "cb-core",
 ]
