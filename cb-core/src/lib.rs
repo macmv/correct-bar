@@ -124,7 +124,7 @@ impl Render<'_> {
     {
       let start = oklch(0.6, 0.1529, 259.41);
       let end = oklch(0.6, 0.1801, 283.76);
-      Brush::Gradient(Gradient::new_linear(cursor, (15.0, 15.0)).with_stops([start, end]))
+      Brush::Gradient(Gradient::new_linear(cursor, rect.center()).with_stops([start, end]))
     } else {
       oklch(0.6, 0.0, 0.0).into()
     };
