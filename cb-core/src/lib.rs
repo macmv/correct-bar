@@ -19,6 +19,7 @@ pub struct RenderStore {
 }
 
 struct Bar {
+  scale:        f32,
   blitter:      TextureBlitter,
   texture:      wgpu::Texture,
   texture_view: wgpu::TextureView,
@@ -46,6 +47,7 @@ impl RenderStore {
     id: BarId,
     device: &wgpu::Device,
     surface_format: wgpu::TextureFormat,
+    scale: f32,
     width: u32,
     height: u32,
   ) {
@@ -64,7 +66,7 @@ impl RenderStore {
 
     let blitter = TextureBlitter::new(&device, surface_format);
 
-    self.bars.insert(id, Bar { texture, texture_view, blitter });
+    self.bars.insert(id, Bar { scale, texture, texture_view, blitter });
   }
 
   pub fn for_bar(&mut self, id: BarId) -> Option<Render<'_>> {
@@ -82,7 +84,7 @@ impl Render<'_> {
 
     self.scene.fill(
       peniko::Fill::NonZero,
-      kurbo::Affine::IDENTITY,
+      kurbo::Affine::scale(bar.scale.into()),
       Color::from_rgb8(55, 55, 55),
       None,
       &kurbo::Rect::new(5.0, 5.0, 15.0, 15.0),

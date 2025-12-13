@@ -257,6 +257,7 @@ impl<A: cb_common::App> Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarI
             state.gpu.add_surface(
               *id,
               surface,
+              monitor.scale as f32,
               width * monitor.scale as u32,
               height * monitor.scale as u32,
             );

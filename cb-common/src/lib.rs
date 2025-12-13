@@ -20,6 +20,7 @@ pub trait App {
     id: BarId,
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
+    scale: f32,
     width: u32,
     height: u32,
   );
@@ -65,6 +66,7 @@ impl<A: App> Gpu<A> {
     &mut self,
     id: BarId,
     surface: wgpu::Surface<'static>,
+    scale: f32,
     width: u32,
     height: u32,
   ) {
@@ -93,8 +95,8 @@ impl<A: App> Gpu<A> {
 
     surface.configure(&self.device, &config);
 
-    self.bars.insert(id, Bar { surface, scale: 1.0 });
-    self.app.create_bar(id, &self.device, surface_format, width, height);
+    self.bars.insert(id, Bar { surface, scale });
+    self.app.create_bar(id, &self.device, surface_format, scale, width, height);
   }
 
   pub fn draw(&mut self, id: BarId) {

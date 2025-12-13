@@ -35,10 +35,11 @@ impl cb_common::App for App {
     id: BarId,
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
+    scale: f32,
     width: u32,
     height: u32,
   ) {
-    self.render.create_bar(id, device, format, width, height);
+    self.render.create_bar(id, device, format, scale, width, height);
   }
 
   fn draw(
