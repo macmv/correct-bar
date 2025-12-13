@@ -55,6 +55,10 @@ impl cb_common::App for App {
       render.draw(device, queue, output);
     }
   }
+
+  fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: i32) {
+    self.render.set_scale(id, device, factor);
+  }
 }
 
 pub fn run(config: Config) {

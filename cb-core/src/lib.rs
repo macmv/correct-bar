@@ -86,6 +86,27 @@ impl RenderStore {
   pub fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) {
     self.bars.get_mut(&id).unwrap().cursor = pos.map(|(x, y)| Point::new(x as f64, y as f64));
   }
+
+  pub fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: i32) {
+    let bar = self.bars.get_mut(&id).unwrap();
+    bar.scale = factor as f32;
+
+    bar.texture = device.create_texture(&wgpu::TextureDescriptor {
+      label:           None,
+      size:            wgpu::Extent3d {
+        width:                 bar.texture.width() * factor as u32,
+        height:                bar.texture.height() * factor as u32,
+        depth_or_array_layers: 1,
+      },
+      mip_level_count: 1,
+      sample_count:    1,
+      dimension:       wgpu::TextureDimension::D2,
+      usage:           wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
+      format:          bar.texture.format(),
+      view_formats:    &[],
+    });
+    bar.texture_view = bar.texture.create_view(&wgpu::TextureViewDescriptor::default());
+  }
 }
 
 impl Render<'_> {

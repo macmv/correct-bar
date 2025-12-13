@@ -152,6 +152,7 @@ impl<A: cb_common::App> Dispatch<wl_surface::WlSurface, BarId> for AppData<A> {
         let bar = state.gpu.bar_mut(*id).unwrap();
         if bar.scale != factor as f32 {
           bar.scale = factor as f32;
+          state.gpu.set_scale(*id, factor);
 
           surface.set_buffer_scale(factor);
           surface.commit();

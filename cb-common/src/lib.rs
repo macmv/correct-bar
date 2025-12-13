@@ -25,6 +25,7 @@ pub trait App {
     height: u32,
   );
   fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>);
+  fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: i32);
   fn draw(&mut self, id: BarId, device: &wgpu::Device, queue: &wgpu::Queue, output: &wgpu::Texture);
 }
 
@@ -32,7 +33,8 @@ pub trait App {
 pub struct BarId(u32);
 
 pub struct Bar {
-  surface: wgpu::Surface<'static>,
+  surface:        wgpu::Surface<'static>,
+  surface_config: wgpu::SurfaceConfiguration,
 
   pub scale: f32,
 }
@@ -100,7 +102,7 @@ impl<A: App> Gpu<A> {
 
     surface.configure(&self.device, &config);
 
-    self.bars.insert(id, Bar { surface, scale });
+    self.bars.insert(id, Bar { surface, surface_config: config, scale });
     self.app.create_bar(id, &self.device, surface_format, scale, width, height);
   }
 
@@ -114,5 +116,15 @@ impl<A: App> Gpu<A> {
 
     self.app.draw(id, &self.device, &self.queue, &output.texture);
     output.present();
+  }
+
+  pub fn set_scale(&mut self, id: BarId, factor: i32) {
+    let Some(bar) = self.bars.get_mut(&id) else { return };
+
+    bar.surface_config.width = bar.surface_config.width * factor as u32;
+    bar.surface_config.height = bar.surface_config.height * factor as u32;
+
+    bar.surface.configure(&self.device, &bar.surface_config);
+    self.app.set_scale(id, &self.device, factor);
   }
 }
