@@ -236,8 +236,6 @@ impl<A: cb_common::App> Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarI
     match event {
       zwlr_layer_surface_v1::Event::Configure { serial, width, height } => {
         if let Some(monitor) = state.monitors.get_mut(id) {
-          monitor.width = width as i32;
-          monitor.height = height as i32;
           monitor.layer_surface.as_ref().unwrap().ack_configure(serial);
 
           unsafe {
@@ -256,7 +254,12 @@ impl<A: cb_common::App> Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarI
                 raw_window_handle:  raw_window,
               })
               .expect("create_surface failed");
-            state.gpu.add_surface(*id, surface, width, height);
+            state.gpu.add_surface(
+              *id,
+              surface,
+              width * monitor.scale as u32,
+              height * monitor.scale as u32,
+            );
             state.gpu.draw(*id);
           }
 
