@@ -99,7 +99,7 @@ impl Render<'_> {
         &self.scene,
         &bar.texture_view,
         &RenderParams {
-          base_color:          /* OpaqueColor::<Oklch>::new([0.33, 0.0, 292.24]).to_rgba8().into() */ Color::from_rgb8(128, 128, 128),
+          base_color:          Color::from_rgba8(0, 0, 0, 0),
           width:               bar.texture.width(),
           height:              bar.texture.height(),
           antialiasing_method: vello::AaConfig::Msaa16,

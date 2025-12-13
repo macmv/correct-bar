@@ -88,7 +88,11 @@ impl<A: App> Gpu<A> {
       width,
       height,
       present_mode: surface_caps.present_modes[0],
-      alpha_mode: surface_caps.alpha_modes[0],
+      alpha_mode: if surface_caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) {
+        wgpu::CompositeAlphaMode::PreMultiplied
+      } else {
+        wgpu::CompositeAlphaMode::Opaque
+      },
       view_formats: vec![],
       desired_maximum_frame_latency: 2,
     };
