@@ -66,7 +66,7 @@ impl RenderStore {
     let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
     let blitter = wgpu::util::TextureBlitterBuilder::new(&device, surface_format)
-      .blend_state(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING)
+      .blend_state(wgpu::BlendState::ALPHA_BLENDING)
       .build();
 
     self.bars.insert(id, Bar { scale, texture, texture_view, blitter });
@@ -111,7 +111,7 @@ impl Render<'_> {
         &self.scene,
         &bar.texture_view,
         &RenderParams {
-          base_color:          Color::from_rgba8(16, 16, 16, 192),
+          base_color:          Color::from_rgba8(0, 0, 0, 0),
           width:               bar.texture.width(),
           height:              bar.texture.height(),
           antialiasing_method: vello::AaConfig::Msaa16,
