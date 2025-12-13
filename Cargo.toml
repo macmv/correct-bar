@@ -8,7 +8,10 @@ edition = "2021"
 [lib]
 
 [dependencies]
+cb-common = { path = "cb-common" }
 cb-backend-wayland = { path = "cb-backend-wayland" }
+cb-core = { path = "cb-core" }
+wgpu = "26.0.1"
 
 crossbeam-channel = "0.5.15"
 parking_lot = "0.12.5"

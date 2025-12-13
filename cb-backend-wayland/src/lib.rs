@@ -45,7 +45,7 @@ struct Monitor {
   scale: i32,
 }
 
-impl<A: 'static> AppData<A> {
+impl<A: cb_common::App + 'static> AppData<A> {
   fn on_change(&mut self, qh: &QueueHandle<AppData<A>>) {
     if let Some(shell) = &self.shell
       && let Some(compositor) = &self.compositor
@@ -152,7 +152,7 @@ impl<A> Dispatch<wl_compositor::WlCompositor, ()> for AppData<A> {
   }
 }
 
-impl<A> Dispatch<wl_surface::WlSurface, BarId> for AppData<A> {
+impl<A: cb_common::App> Dispatch<wl_surface::WlSurface, BarId> for AppData<A> {
   fn event(
     state: &mut Self,
     _surface: &wl_surface::WlSurface,
@@ -224,7 +224,7 @@ impl<A> Dispatch<zwlr_layer_shell_v1::ZwlrLayerShellV1, ()> for AppData<A> {
   }
 }
 
-impl<A> Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarId> for AppData<A> {
+impl<A: cb_common::App> Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarId> for AppData<A> {
   fn event(
     state: &mut Self,
     _shell: &zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
@@ -269,7 +269,7 @@ impl<A> Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarId> for AppData<A
   }
 }
 
-impl<A> Dispatch<wl_callback::WlCallback, BarId> for AppData<A> {
+impl<A: cb_common::App> Dispatch<wl_callback::WlCallback, BarId> for AppData<A> {
   fn event(
     state: &mut Self,
     _: &wl_callback::WlCallback,
@@ -309,7 +309,7 @@ impl<A> Dispatch<wl_pointer::WlPointer, ()> for AppData<A> {
   }
 }
 
-impl<A: 'static> Dispatch<wl_registry::WlRegistry, ()> for AppData<A> {
+impl<A: cb_common::App + 'static> Dispatch<wl_registry::WlRegistry, ()> for AppData<A> {
   fn event(
     state: &mut Self,
     registry: &wl_registry::WlRegistry,
@@ -349,7 +349,7 @@ impl<A: 'static> Dispatch<wl_registry::WlRegistry, ()> for AppData<A> {
   }
 }
 
-pub fn setup<A: 'static>(app: A) {
+pub fn setup<A: cb_common::App + 'static>(config: A::Config) {
   let conn = Connection::connect_to_env().unwrap();
 
   let display = conn.display();
@@ -359,7 +359,7 @@ pub fn setup<A: 'static>(app: A) {
   display.get_registry(&qh, ());
 
   let mut app = AppData {
-    gpu:        Gpu::new(app),
+    gpu:        Gpu::<A>::new(config),
     monitors:   HashMap::new(),
     compositor: None,
     shell:      None,

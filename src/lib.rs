@@ -12,20 +12,27 @@ struct App {
   left_modules:   Vec<Module>,
   center_modules: Vec<Module>,
   right_modules:  Vec<Module>,
+
+  render: cb_core::RenderStore,
 }
 
-impl App {
-  pub fn new(config: Config) -> Self {
+impl cb_common::App for App {
+  type Config = Config;
+
+  fn new(config: Config, device: &wgpu::Device) -> Self {
     App {
       left_modules:   config.modules_left,
       center_modules: config.modules_middle,
       right_modules:  config.modules_right,
+
+      render: cb_core::RenderStore::new(device),
     }
   }
+  fn draw(&mut self) {}
 }
 
 pub fn run(config: Config) {
-  cb_backend_wayland::setup(App::new(config.clone()));
+  cb_backend_wayland::setup::<App>(config.clone());
 
   let bars = backend::wayland::setup(config);
 

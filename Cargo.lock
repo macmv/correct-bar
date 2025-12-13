@@ -146,6 +146,7 @@ dependencies = [
 name = "cb-core"
 version = "0.1.0"
 dependencies = [
+ "cb-common",
  "kurbo",
  "parley",
  "peniko",
@@ -247,6 +248,8 @@ version = "0.1.0"
 dependencies = [
  "alsa-sys",
  "cb-backend-wayland",
+ "cb-common",
+ "cb-core",
  "chrono",
  "crossbeam-channel",
  "dbus",
@@ -257,6 +260,7 @@ dependencies = [
  "serde_json",
  "wayland-client",
  "wayland-protocols",
+ "wgpu",
 ]
 
 [[package]]

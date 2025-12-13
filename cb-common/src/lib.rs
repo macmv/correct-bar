@@ -11,6 +11,13 @@ pub struct Gpu<A> {
   app: A,
 }
 
+pub trait App {
+  type Config;
+
+  fn new(config: Self::Config, device: &wgpu::Device) -> Self;
+  fn draw(&mut self);
+}
+
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BarId(u32);
 
@@ -24,8 +31,8 @@ impl BarId {
   pub fn new(id: u32) -> Self { BarId(id) }
 }
 
-impl<A> Gpu<A> {
-  pub fn new(app: A) -> Self {
+impl<A: App> Gpu<A> {
+  pub fn new(config: A::Config) -> Self {
     let instance = wgpu::Instance::new(&Default::default());
 
     let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -36,6 +43,8 @@ impl<A> Gpu<A> {
     .unwrap();
 
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default())).unwrap();
+
+    let app = A::new(config, &device);
 
     Gpu { instance, adapter, device, queue, bars: HashMap::new(), app }
   }
