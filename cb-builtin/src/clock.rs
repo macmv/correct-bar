@@ -1,4 +1,6 @@
 use cb_bar::Module;
+use cb_core::Text;
+use chrono::{Datelike, Timelike};
 use kurbo::Point;
 use peniko::Color;
 
@@ -10,35 +12,32 @@ pub struct Clock {
 
 impl Module for Clock {
   fn render(&self, ctx: &mut cb_core::Render) {
-    let bounds = ctx.draw_text(Point::new(5.0, 8.0), "hello", self.secondary);
-
-    ctx.draw_button(&bounds.inflate(3.0, 1.0), self.primary);
-
-    /*
     let local = chrono::Local::now();
     let utc = local.naive_utc();
 
-    ctx.draw_text(&local.weekday().to_string(), Color::WHITE);
-    ctx.draw_text(", ", self.secondary);
-    ctx.draw_text(
-      &format!("{:04}-{:02}-{:02}", local.year(), local.month(), local.day()),
+    let mut text = Text::new();
+    text.push(&local.weekday().to_string(), Color::WHITE);
+    text.push(", ", self.secondary);
+    text.push(
+      &format_args!("{:04}-{:02}-{:02}", local.year(), local.month(), local.day()),
       Color::WHITE,
     );
-    ctx.draw_text(" at ", self.secondary);
+    text.push(" at ", self.secondary);
 
     macro_rules! draw_time {
       ( $time:expr ) => {
-        ctx.draw_text(
-          &format!("{:02}:{:02}:{:02}", $time.hour(), $time.minute(), $time.second()),
+        text.push(
+          &format_args!("{:02}:{:02}:{:02}", $time.hour(), $time.minute(), $time.second()),
           Color::WHITE,
         )
       };
     }
 
-    let local_rect = draw_time!(local);
-    ctx.draw_text(" or ", self.secondary);
-    let utc_rect = draw_time!(utc);
-    */
+    draw_time!(local);
+    text.push(" or ", self.secondary);
+    draw_time!(utc);
+
+    ctx.draw_text(Point::new(5.0, 8.0), text, self.secondary);
 
     /*
     fn copy(str: String) {
