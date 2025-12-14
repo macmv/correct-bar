@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap, fmt, ops::Range};
 
 use kurbo::{Affine, Point, Rect, Stroke, Vec2};
 use parley::{FontContext, LayoutContext};
@@ -129,6 +129,39 @@ fn oklch(l: f32, c: f32, h: f32) -> AlphaColor<Srgb> {
   OpaqueColor::<Oklch>::new([l, c, h]).to_rgba8().into()
 }
 
+#[derive(Default)]
+pub struct Text<'a> {
+  text:   Cow<'a, str>,
+  ranges: Vec<(Range<usize>, AlphaColor<Srgb>)>,
+}
+
+impl<'a> From<&'a str> for Text<'a> {
+  fn from(value: &'a str) -> Self { Text { text: Cow::Borrowed(value), ranges: vec![] } }
+}
+
+impl Text<'_> {
+  pub fn new() -> Self { Text::default() }
+
+  pub fn push(&mut self, text: impl fmt::Display, color: AlphaColor<Srgb>) {
+    let start = self.text.len();
+    std::fmt::write(self.text.to_mut(), format_args!("{text}")).unwrap();
+    let end = self.text.len();
+    self.ranges.push((start..end, color));
+  }
+
+  pub fn layout(self, store: &mut RenderStore, brush: Brush, scale: f64) -> parley::Layout<Brush> {
+    let mut builder = store.layout.ranged_builder(&mut store.font, &self.text, 1.0, false);
+    builder.push_default(parley::StyleProperty::Brush(brush));
+    builder.push_default(parley::StyleProperty::FontSize(12.0 * scale as f32));
+
+    for range in self.ranges {
+      builder.push(parley::StyleProperty::Brush(range.1.into()), range.0);
+    }
+
+    builder.build(&self.text)
+  }
+}
+
 impl Render<'_> {
   pub fn set_offset(&mut self, offset: Vec2) { self.offset = offset; }
 
@@ -177,12 +210,8 @@ impl Render<'_> {
     );
   }
 
-  pub fn draw_text(&mut self, origin: Point, text: &str, color: Color) -> Rect {
-    let mut builder = self.store.layout.ranged_builder(&mut self.store.font, &text, 1.0, false);
-    builder.push_default(parley::StyleProperty::Brush(color.into()));
-    builder.push_default(parley::StyleProperty::FontSize(12.0 * self.scale as f32));
-
-    let mut layout: parley::Layout<peniko::Brush> = builder.build(&text);
+  pub fn draw_text<'a>(&mut self, origin: Point, text: impl Into<Text<'a>>, color: Color) -> Rect {
+    let mut layout = text.into().layout(&mut self.store, color.into(), self.scale);
 
     layout.break_all_lines(None);
     layout.align(None, parley::Alignment::Start, parley::AlignmentOptions::default());
