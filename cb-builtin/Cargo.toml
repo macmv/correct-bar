@@ -1,0 +1,17 @@
+[package]
+name = "cb-builtin"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cb-core = { path = "../cb-core" }
+cb-bar = { path = "../cb-bar" }
+
+kurbo = "0.12"
+peniko = "0.5"
+
+chrono = { version = "0.4.42", optional = true }
+
+[features]
+default = ["clock"]
+clock = ["dep:chrono"]
