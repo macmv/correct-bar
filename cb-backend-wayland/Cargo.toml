@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 cb-common = { path = "../cb-common" }
+rustix = "1.1.2"
 wayland-backend = { version = "0.3.11", features = ["client_system"] }
 
 wayland-client = "0.31.11"

@@ -401,10 +401,49 @@ pub fn setup<A: cb_common::App + 'static>(config: A::Config) {
 
     if app.gpu.needs_render() {
       app.gpu.render();
-    } else {
-      event_queue.blocking_dispatch(&mut app).unwrap();
+      continue;
     }
 
-    std::thread::sleep(std::time::Duration::from_millis(10));
+    event_queue.flush().unwrap();
+
+    if let Some(guard) = event_queue.prepare_read() {
+      blocking_read(guard, Some(std::time::Duration::from_secs(1))).unwrap();
+    }
+  }
+}
+
+// Copied from `wayland-client::conn::blocking_read`, so we can pass in a
+// timeout.
+fn blocking_read(
+  guard: wayland_backend::client::ReadEventsGuard,
+  timeout: Option<std::time::Duration>,
+) -> Result<usize, wayland_backend::client::WaylandError> {
+  let fd = guard.connection_fd();
+  let mut fds =
+    [rustix::event::PollFd::new(&fd, rustix::event::PollFlags::IN | rustix::event::PollFlags::ERR)];
+
+  loop {
+    match rustix::event::poll(
+      &mut fds,
+      timeout
+        .map(|t| rustix::fs::Timespec { tv_sec: t.as_secs() as _, tv_nsec: t.subsec_nanos() as _ })
+        .as_ref(),
+    ) {
+      Ok(_) => break,
+      Err(rustix::io::Errno::INTR) => continue,
+      Err(e) => return Err(wayland_backend::client::WaylandError::Io(e.into())),
+    }
+  }
+
+  // at this point the fd is ready
+  match guard.read() {
+    Ok(n) => Ok(n),
+    // if we are still "wouldblock", just return 0; the caller will retry.
+    Err(wayland_backend::client::WaylandError::Io(e))
+      if e.kind() == std::io::ErrorKind::WouldBlock =>
+    {
+      Ok(0)
+    }
+    Err(e) => Err(e),
   }
 }
