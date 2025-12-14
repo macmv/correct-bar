@@ -156,7 +156,7 @@ impl<A: cb_common::App> Dispatch<wl_surface::WlSurface, BarId> for AppData<A> {
 
           surface.set_buffer_scale(factor);
           surface.commit();
-          state.gpu.draw(*id);
+          state.gpu.render_bar(*id);
         }
       }
       _ => {
@@ -249,7 +249,7 @@ impl<A: cb_common::App> Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarI
               })
               .expect("create_surface failed");
             state.gpu.add_surface(*id, surface, 1.0, width, height);
-            state.gpu.draw(*id);
+            state.gpu.render_bar(*id);
           }
 
           // TODO: Request a new frame with this:
@@ -271,7 +271,7 @@ impl<A: cb_common::App> Dispatch<wl_callback::WlCallback, BarId> for AppData<A> 
     _: &QueueHandle<Self>,
   ) {
     println!("drawing!!");
-    state.gpu.draw(*id);
+    state.gpu.render_bar(*id);
   }
 }
 
@@ -397,7 +397,13 @@ pub fn setup<A: cb_common::App + 'static>(config: A::Config) {
   app.display = Some(display);
 
   loop {
-    event_queue.roundtrip(&mut app).unwrap();
+    event_queue.dispatch_pending(&mut app).unwrap();
+
+    if app.gpu.needs_render() {
+      app.gpu.render();
+    } else {
+      event_queue.blocking_dispatch(&mut app).unwrap();
+    }
 
     std::thread::sleep(std::time::Duration::from_millis(10));
   }

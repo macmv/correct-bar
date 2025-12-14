@@ -37,6 +37,7 @@ pub struct Bar {
   surface_config: wgpu::SurfaceConfiguration,
 
   pub scale: f32,
+  pub dirty: bool,
 }
 
 impl BarId {
@@ -102,16 +103,30 @@ impl<A: App> Gpu<A> {
 
     surface.configure(&self.device, &config);
 
-    self.bars.insert(id, Bar { surface, surface_config: config, scale });
+    self.bars.insert(id, Bar { surface, surface_config: config, scale, dirty: true });
     self.app.create_bar(id, &self.device, surface_format, scale, width, height);
   }
 
   pub fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) {
     self.app.move_mouse(id, pos);
-    self.draw(id);
+    self.bar_mut(id).unwrap().dirty = true;
   }
 
-  pub fn draw(&mut self, id: BarId) {
+  pub fn needs_render(&self) -> bool { self.bars.iter().any(|(_, bar)| bar.dirty) }
+
+  pub fn render(&mut self) {
+    for (id, bar) in &mut self.bars {
+      if bar.dirty {
+        bar.dirty = false;
+        let output = bar.surface.get_current_texture().unwrap();
+
+        self.app.draw(*id, &self.device, &self.queue, &output.texture);
+        output.present();
+      }
+    }
+  }
+
+  pub fn render_bar(&mut self, id: BarId) {
     let output = self.bars.get(&id).unwrap().surface.get_current_texture().unwrap();
 
     self.app.draw(id, &self.device, &self.queue, &output.texture);
