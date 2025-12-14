@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use cb_core::{BarId, Render};
 use kurbo::{Rect, Size};
 
@@ -34,11 +36,12 @@ struct ModuleLayout {
 }
 
 pub struct Config {
-  pub bars: Vec<Bar>,
+  pub make_bar: fn() -> Bar,
 }
 
 struct App {
-  bars: Vec<BarLayout>,
+  config: Config,
+  bars:   HashMap<BarId, BarLayout>,
 
   render: cb_core::RenderStore,
 }
@@ -140,11 +143,7 @@ impl cb_core::App for App {
   type Config = Config;
 
   fn new(config: Config, device: &cb_core::wgpu::Device) -> Self {
-    App {
-      bars: config.bars.into_iter().map(|b| b.into_layout()).collect(),
-
-      render: cb_core::RenderStore::new(device),
-    }
+    App { config, bars: HashMap::new(), render: cb_core::RenderStore::new(device) }
   }
 
   fn create_bar(
@@ -156,13 +155,15 @@ impl cb_core::App for App {
     width: u32,
     height: u32,
   ) {
+    self.bars.insert(id, (self.config.make_bar)().into_layout());
+
     self.render.create_bar(id, device, format, scale, width, height);
   }
 
-  fn dirty(&self, _id: BarId) -> bool { self.bars[0].dirty() }
+  fn dirty(&self, id: BarId) -> bool { self.bars.get(&id).unwrap().dirty() }
 
   fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) {
-    self.bars[0].force_dirty = true;
+    self.bars.get_mut(&id).unwrap().force_dirty = true;
     self.render.move_mouse(id, pos);
   }
 
@@ -174,7 +175,7 @@ impl cb_core::App for App {
     output: &cb_core::wgpu::Texture,
   ) {
     if let Some(mut render) = self.render.for_bar(id) {
-      self.bars[0].draw(&mut render);
+      self.bars.get_mut(&id).unwrap().draw(&mut render);
 
       render.draw(device, queue, output);
     }
