@@ -160,7 +160,7 @@ impl<A: cb_common::App> Dispatch<wl_surface::WlSurface, BarId> for AppData<A> {
         }
       }
       _ => {
-        println!("surface event: {:?}", event);
+        // println!("surface event: {:?}", event);
       }
     }
   }
