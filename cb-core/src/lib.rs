@@ -36,6 +36,7 @@ struct Bar {
 
 pub struct Render<'a> {
   bar:    BarId,
+  scale:  f64,
   cursor: Option<Point>,
 
   offset: Vec2,
@@ -87,6 +88,7 @@ impl RenderStore {
     if let Some(bar) = self.bars.get(&id) {
       Some(Render {
         bar:    id,
+        scale:  bar.scale.into(),
         cursor: bar.cursor,
         offset: Vec2::ZERO,
         store:  self,
@@ -131,8 +133,7 @@ impl Render<'_> {
   pub fn set_offset(&mut self, offset: Vec2) { self.offset = offset; }
 
   fn transform(&self) -> Affine {
-    let bar = &self.store.bars[&self.bar];
-    Affine::scale(bar.scale.into()) * Affine::translate(self.offset)
+    Affine::scale(self.scale.into()) * Affine::translate(self.offset)
   }
 
   pub fn stroke(&mut self, shape: &impl kurbo::Shape, color: AlphaColor<Srgb>) {
@@ -140,12 +141,10 @@ impl Render<'_> {
   }
 
   pub fn draw_button(&mut self, rect: &kurbo::Rect, color: AlphaColor<Srgb>) {
-    let bar = &self.store.bars[&self.bar];
-
     let rect = *rect + self.offset;
     let mut quad = Quad::from(rect);
 
-    let brush = if let Some(cursor) = bar.cursor
+    let brush = if let Some(cursor) = self.cursor
       && rect.contains(cursor)
     {
       quad = Quad::new_tilted(rect, cursor, 12_f64.to_radians(), 100.0);
@@ -153,7 +152,7 @@ impl Render<'_> {
       let start = oklch(0.6, 0.1529, 259.41);
       let end = oklch(0.6, 0.1801, 283.76);
       Brush::Gradient(Gradient::new_linear(cursor, rect.center()).with_stops([start, end]))
-    } else if let Some(cursor) = bar.cursor {
+    } else if let Some(cursor) = self.cursor {
       let dx = (rect.x0 - cursor.x).max(cursor.x - rect.x1).max(0.0);
       let dy = (rect.y0 - cursor.y).max(cursor.y - rect.y1).max(0.0);
       let dist = (dx * dx + dy * dy).sqrt();
@@ -171,7 +170,7 @@ impl Render<'_> {
 
     self.scene.stroke(
       &Stroke::new(2.0),
-      kurbo::Affine::scale(bar.scale.into()),
+      kurbo::Affine::scale(self.scale.into()),
       &brush,
       None,
       &quad,
@@ -179,11 +178,9 @@ impl Render<'_> {
   }
 
   pub fn draw_text(&mut self, origin: Point, text: &str, color: Color) -> Rect {
-    let scale = self.store.bars[&self.bar].scale;
-
     let mut builder = self.store.layout.ranged_builder(&mut self.store.font, &text, 1.0, false);
     builder.push_default(parley::StyleProperty::Brush(color.into()));
-    builder.push_default(parley::StyleProperty::FontSize(12.0 * scale));
+    builder.push_default(parley::StyleProperty::FontSize(12.0 * self.scale as f32));
 
     let mut layout: parley::Layout<peniko::Brush> = builder.build(&text);
 
@@ -206,7 +203,7 @@ impl Render<'_> {
           .draw_glyphs(run.font())
           .brush(&glyph_run.style().brush)
           .hint(true)
-          .transform(Affine::translate((origin.to_vec2() + self.offset) * f64::from(scale)))
+          .transform(Affine::translate((origin.to_vec2() + self.offset) * self.scale))
           .glyph_transform(
             run.synthesis().skew().map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0)),
           )
@@ -224,7 +221,7 @@ impl Render<'_> {
       }
     }
 
-    rect.scale_from_origin(1.0 / f64::from(scale)) + origin.to_vec2()
+    rect.scale_from_origin(1.0 / self.scale) + origin.to_vec2()
   }
 
   pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Texture) {
