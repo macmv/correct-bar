@@ -86,7 +86,7 @@ impl BarLayout {
 
     let mut x = self.size.width;
     for module in self.right_modules.iter_mut().rev() {
-      module.bounds = Rect::new(x - 50.0, 0.0, x, self.size.height);
+      module.bounds = Rect::new(x - 240.0, 0.0, x, self.size.height);
       x -= module.bounds.size().width;
     }
   }
