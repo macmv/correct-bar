@@ -12,7 +12,10 @@ cb-common = { path = "cb-common" }
 cb-backend-wayland = { path = "cb-backend-wayland" }
 cb-core = { path = "cb-core" }
 cb-bar = { path = "cb-bar" }
+cb-builtin = { path = "cb-builtin" }
+
 wgpu = "26.0.1"
+peniko = "0.5"
 
 crossbeam-channel = "0.5.15"
 parking_lot = "0.12.5"
@@ -28,9 +31,6 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 dbus = "0.9.10"
 libpulse-sys = "1.23.0"
-
-peniko = "0.5"
-cb-builtin = { path = "cb-builtin" }
 
 [features]
 default = ["wayland"]
