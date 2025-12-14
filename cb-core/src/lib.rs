@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use kurbo::{Point, Stroke};
+use kurbo::{Point, Stroke, Vec2};
 use parley::{FontContext, LayoutContext};
 use peniko::{
   Brush, Color, Gradient,
@@ -37,6 +37,8 @@ struct Bar {
 pub struct Render<'a> {
   bar:    BarId,
   cursor: Option<Point>,
+
+  offset: Vec2,
 
   store: &'a mut RenderStore,
   scene: Scene,
@@ -83,7 +85,13 @@ impl RenderStore {
 
   pub fn for_bar(&mut self, id: BarId) -> Option<Render<'_>> {
     if let Some(bar) = self.bars.get(&id) {
-      Some(Render { bar: id, cursor: bar.cursor, store: self, scene: Scene::new() })
+      Some(Render {
+        bar:    id,
+        cursor: bar.cursor,
+        offset: Vec2::ZERO,
+        store:  self,
+        scene:  Scene::new(),
+      })
     } else {
       None
     }
@@ -116,6 +124,20 @@ impl RenderStore {
 }
 
 impl Render<'_> {
+  pub fn set_offset(&mut self, offset: Vec2) { self.offset = offset; }
+
+  pub fn draw_button(&mut self, shape: &impl kurbo::Shape, color: AlphaColor<Srgb>) {
+    let bar = &self.store.bars[&self.bar];
+
+    self.scene.stroke(
+      &Stroke::new(2.0),
+      kurbo::Affine::scale(bar.scale.into()) * kurbo::Affine::translate(self.offset),
+      &color,
+      None,
+      &shape,
+    );
+  }
+
   pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Texture) {
     let bar = &self.store.bars[&self.bar];
 

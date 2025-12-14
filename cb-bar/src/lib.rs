@@ -93,12 +93,15 @@ impl BarLayout {
 
   fn draw(&self, render: &mut Render) {
     for module in &self.left_modules {
+      render.set_offset(module.bounds.origin().to_vec2());
       module.module.render(render);
     }
     for module in &self.center_modules {
+      render.set_offset(module.bounds.origin().to_vec2());
       module.module.render(render);
     }
     for module in &self.right_modules {
+      render.set_offset(module.bounds.origin().to_vec2());
       module.module.render(render);
     }
   }

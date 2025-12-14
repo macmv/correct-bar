@@ -153,6 +153,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cb-builtin"
+version = "0.1.0"
+dependencies = [
+ "cb-bar",
+ "cb-core",
+ "chrono",
+ "kurbo",
+ "peniko",
+]
+
+[[package]]
 name = "cb-common"
 version = "0.1.0"
 dependencies = [
@@ -268,6 +279,7 @@ dependencies = [
  "alsa-sys",
  "cb-backend-wayland",
  "cb-bar",
+ "cb-builtin",
  "cb-common",
  "cb-core",
  "chrono",
@@ -275,6 +287,7 @@ dependencies = [
  "dbus",
  "libpulse-sys",
  "parking_lot",
+ "peniko",
  "rusttype",
  "serde",
  "serde_json",
