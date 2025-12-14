@@ -1,5 +1,5 @@
 use cb_bar::Module;
-use kurbo::Rect;
+use kurbo::{Point, Rect};
 use peniko::Color;
 
 #[derive(Clone)]
@@ -11,6 +11,8 @@ pub struct Clock {
 impl Module for Clock {
   fn render(&self, ctx: &mut cb_core::Render) {
     ctx.draw_button(&Rect::new(0.0, 0.0, 20.0, 20.0), self.primary);
+
+    ctx.draw_text(Point::new(5.0, 5.0), "hello", self.secondary);
 
     /*
     let local = chrono::Local::now();

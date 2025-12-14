@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use kurbo::{Point, Stroke, Vec2};
+use kurbo::{Affine, Point, Rect, Stroke, Vec2};
 use parley::{FontContext, LayoutContext};
 use peniko::{
-  Brush, Color, Gradient,
+  Brush, Color, Fill, Gradient,
   color::{AlphaColor, Oklch, OpaqueColor, Srgb},
 };
 use vello::{RenderParams, Scene};
@@ -18,7 +18,7 @@ mod quad;
 
 pub struct RenderStore {
   font:   FontContext,
-  layout: LayoutContext,
+  layout: LayoutContext<peniko::Brush>,
 
   render: vello::Renderer,
 
@@ -126,16 +126,65 @@ impl RenderStore {
 impl Render<'_> {
   pub fn set_offset(&mut self, offset: Vec2) { self.offset = offset; }
 
-  pub fn draw_button(&mut self, shape: &impl kurbo::Shape, color: AlphaColor<Srgb>) {
+  fn transform(&self) -> Affine {
     let bar = &self.store.bars[&self.bar];
+    Affine::scale(bar.scale.into()) * Affine::translate(self.offset)
+  }
 
-    self.scene.stroke(
-      &Stroke::new(2.0),
-      kurbo::Affine::scale(bar.scale.into()) * kurbo::Affine::translate(self.offset),
-      &color,
-      None,
-      &shape,
+  pub fn draw_button(&mut self, shape: &impl kurbo::Shape, color: AlphaColor<Srgb>) {
+    self.scene.stroke(&Stroke::new(2.0), self.transform(), &color, None, &shape);
+  }
+
+  pub fn draw_text(&mut self, origin: Point, text: &str, color: Color) {
+    let scale = self.store.bars[&self.bar].scale;
+
+    let mut builder = self.store.layout.ranged_builder(&mut self.store.font, &text, 1.0, false);
+    builder.push_default(parley::StyleProperty::Brush(color.into()));
+    builder.push_default(parley::StyleProperty::FontSize(12.0 * scale));
+
+    let mut layout: parley::Layout<peniko::Brush> = builder.build(&text);
+
+    layout.break_all_lines(None);
+    layout.align(None, parley::Alignment::Start, parley::AlignmentOptions::default());
+
+    let mut rect = Rect::new(
+      origin.x,
+      origin.y,
+      origin.x + f64::from(layout.width()),
+      origin.y + f64::from(layout.height()),
     );
+
+    for line in layout.lines() {
+      for item in line.items() {
+        let parley::PositionedLayoutItem::GlyphRun(glyph_run) = item else { continue };
+
+        let run = glyph_run.run();
+        rect.y0 = rect.y1.round() - rect.height();
+        let mut x = rect.x0 as f32 + glyph_run.offset();
+        let baseline = (rect.y0 as f32 + glyph_run.baseline()).round();
+
+        self
+          .scene
+          .draw_glyphs(run.font())
+          .brush(&glyph_run.style().brush)
+          .hint(true)
+          .transform(Affine::translate(self.offset * f64::from(scale)))
+          .glyph_transform(
+            run.synthesis().skew().map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0)),
+          )
+          .font_size(run.font_size())
+          .normalized_coords(run.normalized_coords())
+          .draw(
+            Fill::NonZero,
+            glyph_run.glyphs().map(|glyph| {
+              let gx = x + glyph.x;
+              let gy = baseline + glyph.y;
+              x += glyph.advance;
+              vello::Glyph { id: glyph.id.into(), x: gx, y: gy }
+            }),
+          );
+      }
+    }
   }
 
   pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Texture) {
