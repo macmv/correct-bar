@@ -401,7 +401,6 @@ pub fn setup<A: cb_common::App + 'static>(config: A::Config) {
 
     if app.gpu.needs_render() {
       app.gpu.render();
-      continue;
     }
 
     event_queue.flush().unwrap();
