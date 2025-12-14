@@ -8,6 +8,7 @@ pub trait Module {
 
 pub enum Updater {
   None,
+  Animation,
   Every(std::time::Duration),
 }
 
@@ -129,6 +130,7 @@ impl ModuleLayout {
   fn dirty(&self, elapsed: std::time::Duration) -> bool {
     match self.module.updater() {
       Updater::None => false,
+      Updater::Animation => true,
       Updater::Every(interval) => elapsed > interval,
     }
   }
