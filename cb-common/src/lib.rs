@@ -24,6 +24,7 @@ pub trait App {
     width: u32,
     height: u32,
   );
+  fn dirty(&self, id: BarId) -> bool;
   fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>);
   fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: i32);
   fn draw(&mut self, id: BarId, device: &wgpu::Device, queue: &wgpu::Queue, output: &wgpu::Texture);
@@ -37,7 +38,6 @@ pub struct Bar {
   surface_config: wgpu::SurfaceConfiguration,
 
   pub scale: f32,
-  pub dirty: bool,
 }
 
 impl BarId {
@@ -103,24 +103,20 @@ impl<A: App> Gpu<A> {
 
     surface.configure(&self.device, &config);
 
-    self.bars.insert(id, Bar { surface, surface_config: config, scale, dirty: true });
+    self.bars.insert(id, Bar { surface, surface_config: config, scale });
     self.app.create_bar(id, &self.device, surface_format, scale, width, height);
   }
 
-  pub fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) {
-    self.app.move_mouse(id, pos);
-    self.bar_mut(id).unwrap().dirty = true;
-  }
+  pub fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) { self.app.move_mouse(id, pos); }
 
-  pub fn needs_render(&self) -> bool { self.bars.iter().any(|(_, bar)| bar.dirty) }
+  pub fn needs_render(&self) -> bool { self.bars.keys().any(|id| self.app.dirty(*id)) }
 
   pub fn render(&mut self) {
-    for (id, bar) in &mut self.bars {
-      if bar.dirty {
-        bar.dirty = false;
+    for (&id, bar) in &mut self.bars {
+      if self.app.dirty(id) {
         let output = bar.surface.get_current_texture().unwrap();
 
-        self.app.draw(*id, &self.device, &self.queue, &output.texture);
+        self.app.draw(id, &self.device, &self.queue, &output.texture);
         output.present();
       }
     }

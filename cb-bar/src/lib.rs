@@ -2,7 +2,13 @@ use cb_core::{BarId, Render};
 use kurbo::{Rect, Size};
 
 pub trait Module {
+  fn updater(&self) -> Updater { Updater::None }
   fn render(&self, render: &mut Render);
+}
+
+pub enum Updater {
+  None,
+  Every(std::time::Duration),
 }
 
 pub struct Bar {
@@ -12,7 +18,9 @@ pub struct Bar {
 }
 
 struct BarLayout {
-  size: Size,
+  size:        Size,
+  last_draw:   std::time::Instant,
+  force_dirty: bool,
 
   left_modules:   Vec<ModuleLayout>,
   center_modules: Vec<ModuleLayout>,
@@ -39,7 +47,9 @@ pub fn run(config: Config) { cb_backend_wayland::setup::<App>(config); }
 impl Bar {
   fn into_layout(self) -> BarLayout {
     let mut layout = BarLayout {
-      size: Size::new(1920.0, 30.0),
+      size:        Size::new(1920.0, 30.0),
+      last_draw:   std::time::Instant::now(),
+      force_dirty: true,
 
       left_modules:   self
         .left_modules
@@ -91,18 +101,35 @@ impl BarLayout {
     }
   }
 
-  fn draw(&self, render: &mut Render) {
-    for module in &self.left_modules {
+  fn dirty(&self) -> bool {
+    if self.force_dirty {
+      return true;
+    }
+
+    let elapsed = self.last_draw.elapsed();
+    self.modules().any(|m| m.dirty(elapsed))
+  }
+
+  fn draw(&mut self, render: &mut Render) {
+    self.last_draw = std::time::Instant::now();
+    self.force_dirty = false;
+
+    for module in self.modules() {
       render.set_offset(module.bounds.origin().to_vec2());
       module.module.render(render);
     }
-    for module in &self.center_modules {
-      render.set_offset(module.bounds.origin().to_vec2());
-      module.module.render(render);
-    }
-    for module in &self.right_modules {
-      render.set_offset(module.bounds.origin().to_vec2());
-      module.module.render(render);
+  }
+
+  fn modules(&self) -> impl Iterator<Item = &ModuleLayout> {
+    self.left_modules.iter().chain(self.center_modules.iter()).chain(self.right_modules.iter())
+  }
+}
+
+impl ModuleLayout {
+  fn dirty(&self, elapsed: std::time::Duration) -> bool {
+    match self.module.updater() {
+      Updater::None => false,
+      Updater::Every(interval) => elapsed > interval,
     }
   }
 }
@@ -130,7 +157,12 @@ impl cb_core::App for App {
     self.render.create_bar(id, device, format, scale, width, height);
   }
 
-  fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) { self.render.move_mouse(id, pos); }
+  fn dirty(&self, _id: BarId) -> bool { self.bars[0].dirty() }
+
+  fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) {
+    self.bars[0].force_dirty = true;
+    self.render.move_mouse(id, pos);
+  }
 
   fn draw(
     &mut self,
