@@ -135,7 +135,7 @@ impl Render<'_> {
     self.scene.stroke(&Stroke::new(2.0), self.transform(), &color, None, &shape);
   }
 
-  pub fn draw_text(&mut self, origin: Point, text: &str, color: Color) {
+  pub fn draw_text(&mut self, origin: Point, text: &str, color: Color) -> Rect {
     let scale = self.store.bars[&self.bar].scale;
 
     let mut builder = self.store.layout.ranged_builder(&mut self.store.font, &text, 1.0, false);
@@ -147,12 +147,7 @@ impl Render<'_> {
     layout.break_all_lines(None);
     layout.align(None, parley::Alignment::Start, parley::AlignmentOptions::default());
 
-    let mut rect = Rect::new(
-      origin.x,
-      origin.y,
-      origin.x + f64::from(layout.width()),
-      origin.y + f64::from(layout.height()),
-    );
+    let mut rect = Rect::new(0.0, 0.0, f64::from(layout.width()), f64::from(layout.height()));
 
     for line in layout.lines() {
       for item in line.items() {
@@ -168,7 +163,7 @@ impl Render<'_> {
           .draw_glyphs(run.font())
           .brush(&glyph_run.style().brush)
           .hint(true)
-          .transform(Affine::translate(self.offset * f64::from(scale)))
+          .transform(Affine::translate((origin.to_vec2() + self.offset) * f64::from(scale)))
           .glyph_transform(
             run.synthesis().skew().map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0)),
           )
@@ -185,6 +180,8 @@ impl Render<'_> {
           );
       }
     }
+
+    rect.scale_from_origin(1.0 / f64::from(scale)) + origin.to_vec2()
   }
 
   pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Texture) {
