@@ -17,52 +17,15 @@ struct App {
   render: cb_core::RenderStore,
 }
 
-impl cb_common::App for App {
-  type Config = Config;
-
-  fn new(config: Config, device: &wgpu::Device) -> Self {
-    App {
-      left_modules:   config.modules_left,
-      center_modules: config.modules_middle,
-      right_modules:  config.modules_right,
-
-      render: cb_core::RenderStore::new(device),
-    }
-  }
-
-  fn create_bar(
-    &mut self,
-    id: BarId,
-    device: &wgpu::Device,
-    format: wgpu::TextureFormat,
-    scale: f32,
-    width: u32,
-    height: u32,
-  ) {
-    self.render.create_bar(id, device, format, scale, width, height);
-  }
-
-  fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) { self.render.move_mouse(id, pos); }
-
-  fn draw(
-    &mut self,
-    id: BarId,
-    device: &wgpu::Device,
-    queue: &wgpu::Queue,
-    output: &wgpu::Texture,
-  ) {
-    if let Some(mut render) = self.render.for_bar(id) {
-      render.draw(device, queue, output);
-    }
-  }
-
-  fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: i32) {
-    self.render.set_scale(id, device, factor);
-  }
-}
-
 pub fn run(config: Config) {
-  cb_backend_wayland::setup::<App>(config.clone());
+  cb_bar::run(cb_bar::Config {
+    bars: vec![cb_bar::Bar {
+      left_modules:   vec![],
+      center_modules: vec![],
+      right_modules:  vec![],
+    }],
+  });
+  // cb_backend_wayland::setup::<cb_bar::App>(config.clone());
 
   let bars = backend::wayland::setup(config);
 

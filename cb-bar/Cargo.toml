@@ -1,0 +1,10 @@
+[package]
+name = "cb-bar"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cb-backend-wayland = { path = "../cb-backend-wayland" }
+cb-core = { path = "../cb-core" }
+
+kurbo = "0.12"

@@ -144,6 +144,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cb-bar"
+version = "0.1.0"
+dependencies = [
+ "cb-backend-wayland",
+ "cb-core",
+ "kurbo",
+]
+
+[[package]]
 name = "cb-common"
 version = "0.1.0"
 dependencies = [
@@ -258,6 +267,7 @@ version = "0.1.0"
 dependencies = [
  "alsa-sys",
  "cb-backend-wayland",
+ "cb-bar",
  "cb-common",
  "cb-core",
  "chrono",

@@ -11,6 +11,7 @@ edition = "2021"
 cb-common = { path = "cb-common" }
 cb-backend-wayland = { path = "cb-backend-wayland" }
 cb-core = { path = "cb-core" }
+cb-bar = { path = "cb-bar" }
 wgpu = "26.0.1"
 
 crossbeam-channel = "0.5.15"
@@ -37,4 +38,5 @@ members = [
   "cb-common",
   "cb-backend-wayland",
   "cb-core",
+  "cb-bar",
 ]

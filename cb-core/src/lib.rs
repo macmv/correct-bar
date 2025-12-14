@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use cb_common::BarId;
 use kurbo::{Point, Stroke};
 use parley::{FontContext, LayoutContext};
 use peniko::{
@@ -11,6 +10,9 @@ use vello::{RenderParams, Scene};
 use wgpu::util::TextureBlitter;
 
 use crate::quad::Quad;
+
+pub use cb_common::{App, BarId};
+pub use wgpu;
 
 mod quad;
 
