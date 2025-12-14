@@ -4,27 +4,9 @@ pub mod config;
 pub mod math;
 
 use bar::Updater;
-use cb_common::BarId;
 use config::Config;
 
-use crate::bar::Module;
-
-struct App {
-  left_modules:   Vec<Module>,
-  center_modules: Vec<Module>,
-  right_modules:  Vec<Module>,
-
-  render: cb_core::RenderStore,
-}
-
 pub fn run(config: Config) {
-  cb_bar::run(cb_bar::Config {
-    bars: vec![cb_bar::Bar {
-      left_modules:   vec![],
-      center_modules: vec![],
-      right_modules:  vec![],
-    }],
-  });
   // cb_backend_wayland::setup::<cb_bar::App>(config.clone());
 
   let bars = backend::wayland::setup(config);
