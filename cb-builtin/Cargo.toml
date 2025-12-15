@@ -13,7 +13,8 @@ peniko = "0.5"
 chrono = { version = "0.4.42", optional = true }
 
 [features]
-default = ["clock", "proc", "hwmon"]
+default = ["clock", "proc", "hwmon", "hypr"]
 clock = ["dep:chrono"]
 proc = []
 hwmon = []
+hypr = []

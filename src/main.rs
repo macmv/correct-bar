@@ -5,7 +5,9 @@ const GRAY: Color = Color::new([0.5, 0.0, 0.0, 1.0]);
 fn main() {
   cb_bar::run(cb_bar::Config {
     make_bar: || cb_bar::Bar {
-      left_modules:   vec![],
+      left_modules:   vec![
+        cb_builtin::Hypr { primary: oklch(0.7, 0.2, 310.0), secondary: GRAY }.into()
+      ],
       center_modules: vec![],
       right_modules:  vec![
         cb_builtin::Temp { primary: oklch(0.7, 0.2, 310.0), secondary: GRAY }.into(),

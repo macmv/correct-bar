@@ -149,6 +149,10 @@ impl<'a> From<&'a str> for Text<'a> {
   fn from(value: &'a str) -> Self { Text { text: Cow::Borrowed(value), ranges: vec![] } }
 }
 
+impl<'a> From<&'a String> for Text<'a> {
+  fn from(value: &'a String) -> Self { Text { text: Cow::Borrowed(value), ranges: vec![] } }
+}
+
 impl Text<'_> {
   pub fn new() -> Self { Text::default() }
 
