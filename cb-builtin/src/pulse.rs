@@ -602,31 +602,3 @@ impl Module for PulseModule {
   fn layout(&mut self, _layout: &mut cb_bar::Layout) {}
   fn render(&self, _ctx: &mut Render) {}
 }
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn it_works() {
-    let ctx = context();
-
-    let (ready_tx, ready_rx) = crossbeam_channel::bounded(0);
-    ctx.get_sink_info_list(move |info| {
-      dbg!(&info);
-      ready_tx.send(()).unwrap();
-    });
-
-    ready_rx.recv().unwrap();
-    ctx.set_on_change({
-      let c = ctx.clone();
-      move || {
-        c.get_sink_info_list(move |info| {
-          dbg!(&info);
-        });
-      }
-    });
-
-    std::thread::park();
-  }
-}
