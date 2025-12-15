@@ -17,7 +17,12 @@ pub struct Hypr {
 
 struct HyprModule {
   spec:       Hypr,
-  workspaces: Vec<(TextLayout, bool)>,
+  workspaces: Vec<WorkspaceLayout>,
+}
+
+struct WorkspaceLayout {
+  text:    TextLayout,
+  focused: bool,
 }
 
 impl From<Hypr> for Box<dyn Module> {
@@ -192,7 +197,10 @@ impl Module for HyprModule {
       }
 
       let color = if workspace.focused { self.spec.primary } else { self.spec.secondary };
-      self.workspaces.push((layout.layout_text(&workspace.name, color), workspace.focused));
+      self.workspaces.push(WorkspaceLayout {
+        text:    layout.layout_text(&workspace.name, color),
+        focused: workspace.focused,
+      });
     }
 
     layout.pad(10.0);
@@ -201,10 +209,10 @@ impl Module for HyprModule {
   fn render(&self, ctx: &mut cb_core::Render) {
     for workspace in &self.workspaces {
       ctx.draw_button(
-        &workspace.0.bounds().inflate(5.0, 0.0),
-        if workspace.1 { self.spec.primary } else { self.spec.secondary },
+        &workspace.text.bounds().inflate(5.0, 0.0),
+        if workspace.focused { self.spec.primary } else { self.spec.secondary },
       );
-      ctx.draw(&workspace.0);
+      ctx.draw(&workspace.text);
     }
   }
 }
