@@ -188,6 +188,10 @@ impl From<Color> for Brush {
   fn from(value: Color) -> Self { Brush::Solid(value) }
 }
 
+impl From<Gradient> for Brush {
+  fn from(value: Gradient) -> Self { Brush::Gradient(value) }
+}
+
 impl Brush {
   fn encode(self) -> peniko::Brush {
     match self {
@@ -210,8 +214,8 @@ impl Render<'_> {
     Affine::scale(self.scale.into()) * Affine::translate(self.offset)
   }
 
-  pub fn stroke(&mut self, shape: &impl kurbo::Shape, color: Color) {
-    self.scene.stroke(&Stroke::new(2.0), self.transform(), &encode_color(color), None, &shape);
+  pub fn stroke(&mut self, shape: &impl kurbo::Shape, brush: impl Into<Brush>) {
+    self.scene.stroke(&Stroke::new(2.0), self.transform(), &brush.into().encode(), None, &shape);
   }
 
   pub fn draw(&mut self, drawable: &impl Drawable) { drawable.draw(self); }
