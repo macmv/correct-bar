@@ -8,6 +8,7 @@ fn main() {
       left_modules:   vec![],
       center_modules: vec![],
       right_modules:  vec![
+        cb_builtin::Temp { primary: oklch(0.7, 0.2, 310.0), secondary: GRAY }.into(),
         cb_builtin::Cpu { primary: oklch(0.7, 0.17, 20.0), secondary: GRAY }.into(),
         cb_builtin::Mem { primary: oklch(0.7, 0.19, 140.0), secondary: GRAY }.into(),
         cb_builtin::Clock { primary: Color::WHITE, secondary: GRAY }.into(),

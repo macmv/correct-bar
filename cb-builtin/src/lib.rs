@@ -10,3 +10,4 @@ macro_rules! feature_mod {
 
 feature_mod!(clock, "clock");
 feature_mod!(proc, "proc");
+feature_mod!(hwmon, "hwmon");
