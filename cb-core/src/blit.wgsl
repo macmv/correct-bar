@@ -27,7 +27,11 @@ var texture_sampler: sampler;
 @fragment
 fn fs_main(vs: VertexOutput) -> @location(0) vec4<f32> {
   let color = textureSample(texture, texture_sampler, vs.tex_coords);
-  let rgb = oklab_to_linear_rgb(color.rgb);
+  let rgb = oklab_to_linear_rgb(vec3(
+    color.r,
+    color.g - 0.5,
+    color.b - 0.5,
+  ));
   let srgb = vec3<f32>(
     linear_to_srgb(rgb.r),
     linear_to_srgb(rgb.g),

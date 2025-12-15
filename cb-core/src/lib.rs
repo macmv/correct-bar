@@ -129,8 +129,10 @@ fn oklch(l: f32, c: f32, h: f32) -> AlphaColor<Oklab> {
 
 /// Converts things to sRGB, so that vello uses OkLAB for everything, and then
 /// we undo this conversion in the blitter.
-fn copy_ok_to_srgb(color: AlphaColor<Oklab>) -> AlphaColor<Srgb> {
-  AlphaColor::new(color.components)
+fn encode_color(color: AlphaColor<Oklab>) -> AlphaColor<Srgb> {
+  let [l, a, b, alpha] = color.components;
+
+  AlphaColor::new([l, a + 0.5, b + 0.5, alpha])
 }
 
 #[derive(Default)]
@@ -159,7 +161,7 @@ impl Text<'_> {
     builder.push_default(parley::StyleProperty::FontSize(12.0 * scale as f32));
 
     for range in self.ranges {
-      builder.push(parley::StyleProperty::Brush(copy_ok_to_srgb(range.1).into()), range.0);
+      builder.push(parley::StyleProperty::Brush(encode_color(range.1).into()), range.0);
     }
 
     builder.build(&self.text)
@@ -174,7 +176,7 @@ impl Render<'_> {
   }
 
   pub fn stroke(&mut self, shape: &impl kurbo::Shape, color: AlphaColor<Oklab>) {
-    self.scene.stroke(&Stroke::new(2.0), self.transform(), &copy_ok_to_srgb(color), None, &shape);
+    self.scene.stroke(&Stroke::new(2.0), self.transform(), &encode_color(color), None, &shape);
   }
 
   pub fn draw_button(&mut self, rect: &kurbo::Rect, color: AlphaColor<Oklab>) {
@@ -186,8 +188,8 @@ impl Render<'_> {
     {
       quad = Quad::new_tilted(rect, cursor, 12_f64.to_radians(), 100.0);
 
-      let start = copy_ok_to_srgb(oklch(0.6, 0.1529, 259.41));
-      let end = copy_ok_to_srgb(oklch(0.6, 0.1801, 283.76));
+      let start = encode_color(oklch(0.6, 0.1529, 259.41));
+      let end = encode_color(oklch(0.6, 0.1801, 283.76));
       Brush::Gradient(Gradient::new_linear(cursor, rect.center()).with_stops([start, end]))
     } else if let Some(cursor) = self.cursor {
       let dx = (rect.x0 - cursor.x).max(cursor.x - rect.x1).max(0.0);
@@ -200,9 +202,9 @@ impl Render<'_> {
         quad = Quad::new_tilted(rect, cursor, 12_f64.to_radians() * weight, 100.0);
       }
 
-      copy_ok_to_srgb(color).into()
+      encode_color(color).into()
     } else {
-      copy_ok_to_srgb(color).into()
+      encode_color(color).into()
     };
 
     self.scene.stroke(
@@ -220,7 +222,7 @@ impl Render<'_> {
     text: impl Into<Text<'a>>,
     color: AlphaColor<Oklab>,
   ) -> Rect {
-    let mut layout = text.into().layout(&mut self.store, copy_ok_to_srgb(color).into(), self.scale);
+    let mut layout = text.into().layout(&mut self.store, encode_color(color).into(), self.scale);
 
     layout.break_all_lines(None);
     layout.align(None, parley::Alignment::Start, parley::AlignmentOptions::default());
