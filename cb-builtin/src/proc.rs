@@ -233,6 +233,7 @@ impl From<Cpu> for Box<dyn Module> {
 
 impl Module for Cpu {
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
+  fn layout(&mut self, layout: &mut cb_bar::Layout) {}
   fn render(&self, ctx: &mut Render) {
     SYS.with(|s| {
       let mut sys = s.borrow_mut();
@@ -264,6 +265,7 @@ impl From<Mem> for Box<dyn Module> {
 
 impl Module for Mem {
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
+  fn layout(&mut self, layout: &mut cb_bar::Layout) {}
   fn render(&self, ctx: &mut Render) {
     SYS.with(|s| {
       let mut sys = s.borrow_mut();

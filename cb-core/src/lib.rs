@@ -131,7 +131,7 @@ impl RenderStore {
 
 /// Converts things to sRGB, so that vello uses OkLAB for everything, and then
 /// we undo this conversion in the blitter.
-fn encode_color(color: Color) -> AlphaColor<Srgb> {
+pub fn encode_color(color: Color) -> AlphaColor<Srgb> {
   let [l, a, b, alpha] = color.components;
 
   AlphaColor::new([l, a + 0.5, b + 0.5, alpha])

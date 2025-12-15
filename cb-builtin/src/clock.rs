@@ -20,6 +20,7 @@ impl From<Clock> for Box<dyn Module> {
 impl Module for ClockModule {
   fn updater(&self) -> cb_bar::Updater { cb_bar::Updater::Every(std::time::Duration::from_secs(1)) }
 
+  fn layout(&mut self, layout: &mut cb_bar::Layout) {}
   fn render(&self, ctx: &mut cb_core::Render) {
     let local = chrono::Local::now();
     let utc = local.naive_utc();

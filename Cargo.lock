@@ -151,6 +151,8 @@ dependencies = [
  "cb-backend-wayland",
  "cb-core",
  "kurbo",
+ "parley",
+ "peniko",
 ]
 
 [[package]]

@@ -8,3 +8,5 @@ cb-backend-wayland = { path = "../cb-backend-wayland" }
 cb-core = { path = "../cb-core" }
 
 kurbo = "0.12"
+parley = "0.7.0"
+peniko = "0.5"

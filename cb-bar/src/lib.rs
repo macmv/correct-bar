@@ -3,8 +3,13 @@ use std::collections::HashMap;
 use cb_core::{BarId, Render};
 use kurbo::{Rect, Size};
 
+mod layout;
+
+pub use layout::Layout;
+
 pub trait Module {
   fn updater(&self) -> Updater { Updater::None }
+  fn layout(&mut self, layout: &mut Layout);
   fn render(&self, render: &mut Render);
 }
 
