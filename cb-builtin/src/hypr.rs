@@ -183,7 +183,7 @@ impl HyprState {
 }
 
 impl Module for HyprModule {
-  fn updater(&self) -> cb_bar::Updater { cb_bar::Updater::Animation }
+  fn updater(&self) -> cb_bar::Updater { cb_bar::Updater::None }
 
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
     spawn_listener();
