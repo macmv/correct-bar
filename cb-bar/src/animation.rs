@@ -23,11 +23,18 @@ enum Direction {
 impl Animation {
   pub fn linear(duration: f64) -> Animation { Animation { duration, state: Default::default() } }
 
-  pub fn is_running(&self) -> bool { self.state.borrow().direction == Direction::Forward }
+  pub fn is_running(&self) -> bool {
+    matches!(self.state.borrow().direction, Direction::Forward | Direction::Reverse)
+  }
 
   pub fn interpolate(&self, start: f64, end: f64) -> f64 {
     let t = self.state.borrow().time / self.duration;
     start + (end - start) * t
+  }
+
+  pub fn run(&mut self, forward: bool) {
+    let state = self.state.get_mut();
+    state.direction = if forward { Direction::Forward } else { Direction::Reverse };
   }
 
   pub fn start(&mut self) {

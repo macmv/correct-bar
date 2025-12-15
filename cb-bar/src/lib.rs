@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use cb_core::{BarId, Render, RenderStore};
-use kurbo::{Rect, Size};
+use kurbo::{Point, Rect, Size};
 
 mod animation;
 mod layout;
@@ -11,6 +11,7 @@ pub use layout::{Layout, TextLayout};
 
 pub trait Module {
   fn updater(&self) -> Updater { Updater::None }
+  fn on_hover(&mut self, hover: bool) { let _ = hover; }
   fn layout(&mut self, layout: &mut Layout);
   fn render(&self, render: &mut Render);
 }
@@ -32,6 +33,7 @@ struct BarLayout {
   scale:       f64,
   last_draw:   std::time::Instant,
   force_dirty: bool,
+  hover:       Option<usize>,
 
   left_modules:   Vec<ModuleLayout>,
   center_modules: Vec<ModuleLayout>,
@@ -63,6 +65,7 @@ impl Bar {
       scale,
       last_draw: std::time::Instant::now(),
       force_dirty: true,
+      hover: None,
 
       left_modules: self
         .left_modules
@@ -140,8 +143,45 @@ impl BarLayout {
     }
   }
 
+  fn move_mouse(&mut self, pos: Option<(f64, f64)>) {
+    self.force_dirty = true;
+
+    if let Some(pos) = pos {
+      let pos = Point::new(pos.0, pos.1);
+
+      let hover = self.hover;
+      let mut new_hover = None;
+
+      for (i, m) in self.modules_mut().enumerate() {
+        if m.bounds.contains(pos) {
+          if hover != Some(i) {
+            new_hover = Some(i);
+            m.module.on_hover(true);
+          }
+        } else {
+          if hover == Some(i) {
+            m.module.on_hover(false);
+          }
+        }
+      }
+
+      if new_hover != self.hover {
+        self.hover = new_hover;
+        self.force_dirty = true;
+      }
+    }
+  }
+
   fn modules(&self) -> impl Iterator<Item = &ModuleLayout> {
     self.left_modules.iter().chain(self.center_modules.iter()).chain(self.right_modules.iter())
+  }
+
+  fn modules_mut(&mut self) -> impl Iterator<Item = &mut ModuleLayout> {
+    self
+      .left_modules
+      .iter_mut()
+      .chain(self.center_modules.iter_mut())
+      .chain(self.right_modules.iter_mut())
   }
 }
 
@@ -185,7 +225,8 @@ impl cb_core::App for App {
   fn dirty(&self, id: BarId) -> bool { self.bars.get(&id).unwrap().dirty() }
 
   fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) {
-    self.bars.get_mut(&id).unwrap().force_dirty = true;
+    self.bars.get_mut(&id).unwrap().move_mouse(pos);
+
     self.render.move_mouse(id, pos);
   }
 

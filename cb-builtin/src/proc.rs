@@ -298,6 +298,9 @@ impl Module for MemModule {
       Updater::Every(Duration::from_secs(1))
     }
   }
+
+  fn on_hover(&mut self, hover: bool) { self.hover.run(hover); }
+
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
     layout.pad(5.0);
 
@@ -321,10 +324,6 @@ impl Module for MemModule {
 
       self.text = Some(layout.layout_text(text, self.spec.primary));
     });
-
-    if !self.hover.is_running() {
-      self.hover.start();
-    }
 
     layout.pad(5.0);
   }
