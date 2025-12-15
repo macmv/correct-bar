@@ -3,8 +3,10 @@ use std::collections::HashMap;
 use cb_core::{BarId, Render, RenderStore};
 use kurbo::{Rect, Size};
 
+mod animation;
 mod layout;
 
+pub use animation::Animation;
 pub use layout::{Layout, TextLayout};
 
 pub trait Module {

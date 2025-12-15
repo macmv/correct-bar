@@ -8,7 +8,7 @@ use std::{
   time::{Duration, Instant},
 };
 
-use cb_bar::{Module, TextLayout, Updater};
+use cb_bar::{Animation, Module, TextLayout, Updater};
 use cb_core::{Color, Render, Text};
 use kurbo::{Line, Point};
 
@@ -279,16 +279,25 @@ pub struct Mem {
   pub secondary: Color,
 }
 struct MemModule {
-  spec: Mem,
-  text: Option<TextLayout>,
+  spec:  Mem,
+  hover: Animation,
+  text:  Option<TextLayout>,
 }
 
 impl From<Mem> for Box<dyn Module> {
-  fn from(spec: Mem) -> Self { Box::new(MemModule { spec, text: None }) }
+  fn from(spec: Mem) -> Self {
+    Box::new(MemModule { spec, hover: Animation::linear(0.5), text: None })
+  }
 }
 
 impl Module for MemModule {
-  fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
+  fn updater(&self) -> Updater {
+    if self.hover.is_running() {
+      Updater::Animation
+    } else {
+      Updater::Every(Duration::from_secs(1))
+    }
+  }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
     layout.pad(5.0);
 
