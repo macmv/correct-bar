@@ -191,6 +191,8 @@ impl cb_core::App for App {
     queue: &cb_core::wgpu::Queue,
     output: &cb_core::wgpu::Texture,
   ) {
+    self.bars.get_mut(&id).unwrap().layout(&mut self.render);
+
     if let Some(mut render) = self.render.for_bar(id) {
       self.bars.get_mut(&id).unwrap().draw(&mut render);
 
