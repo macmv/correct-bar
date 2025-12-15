@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, time::Instant};
 
 pub struct Animation {
   duration: f64,
@@ -32,6 +32,7 @@ impl Ease {
 
 #[derive(Default)]
 struct State {
+  running:   Option<Instant>,
   direction: Direction,
   time:      f64,
 }
@@ -39,10 +40,8 @@ struct State {
 #[derive(Clone, Copy, Default, PartialEq)]
 enum Direction {
   #[default]
-  Start,
   Forward,
   Reverse,
-  End,
 }
 
 macro_rules! ease {
@@ -59,9 +58,7 @@ impl Animation {
   ease!(CubicOut, ease_out);
   ease!(CubicInOut, ease_in_out);
 
-  pub fn is_running(&self) -> bool {
-    matches!(self.state.borrow().direction, Direction::Forward | Direction::Reverse)
-  }
+  pub fn is_running(&self) -> bool { self.state.borrow().running.is_some() }
 
   pub fn interpolate(&self, start: f64, end: f64) -> f64 {
     let t = self.state.borrow().time / self.duration;
@@ -70,32 +67,38 @@ impl Animation {
 
   pub fn run(&mut self, forward: bool) {
     let state = self.state.get_mut();
+    state.running = Some(Instant::now());
     state.direction = if forward { Direction::Forward } else { Direction::Reverse };
   }
 
   pub fn start(&mut self) {
     let state = self.state.get_mut();
+    state.running = Some(Instant::now());
     state.time = 0.0;
     state.direction = Direction::Forward;
   }
 
   pub fn start_reverse(&mut self) {
     let state = self.state.get_mut();
+    state.running = Some(Instant::now());
     state.time = self.duration;
     state.direction = Direction::Reverse;
   }
 
-  pub fn advance(&self, dt: std::time::Duration) {
+  pub fn advance(&self, now: std::time::Instant) {
     let mut state = self.state.borrow_mut();
 
+    let Some(start) = state.running else { return };
+    let dt = now - start;
+    state.running = Some(now);
+
     match state.direction {
-      Direction::Start | Direction::End => {}
       Direction::Forward => {
         state.time += dt.as_secs_f64();
 
         if state.time >= self.duration {
           state.time = self.duration;
-          state.direction = Direction::End;
+          state.running = None;
         }
       }
       Direction::Reverse => {
@@ -103,7 +106,7 @@ impl Animation {
 
         if state.time <= 0.0 {
           state.time = 0.0;
-          state.direction = Direction::Start;
+          state.running = None;
         }
       }
     }
