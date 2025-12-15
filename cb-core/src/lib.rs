@@ -4,7 +4,7 @@ use kurbo::{Affine, Point, Rect, Stroke, Vec2};
 use parley::{FontContext, LayoutContext};
 use peniko::{
   Brush, Color, Fill, Gradient,
-  color::{AlphaColor, Oklch, OpaqueColor, Srgb},
+  color::{AlphaColor, Oklab, Oklch, OpaqueColor, Srgb},
 };
 use vello::{RenderParams, Scene};
 
@@ -123,14 +123,20 @@ impl RenderStore {
   }
 }
 
-fn oklch(l: f32, c: f32, h: f32) -> AlphaColor<Srgb> {
-  OpaqueColor::<Oklch>::new([l, c, h]).to_rgba8().into()
+fn oklch(l: f32, c: f32, h: f32) -> AlphaColor<Oklab> {
+  OpaqueColor::<Oklch>::new([l, c, h]).with_alpha(1.0).convert()
+}
+
+/// Converts things to sRGB, so that vello uses OkLAB for everything, and then
+/// we undo this conversion in the blitter.
+fn copy_ok_to_srgb(color: AlphaColor<Oklab>) -> AlphaColor<Srgb> {
+  AlphaColor::new(color.components)
 }
 
 #[derive(Default)]
 pub struct Text<'a> {
   text:   Cow<'a, str>,
-  ranges: Vec<(Range<usize>, AlphaColor<Srgb>)>,
+  ranges: Vec<(Range<usize>, AlphaColor<Oklab>)>,
 }
 
 impl<'a> From<&'a str> for Text<'a> {
@@ -140,7 +146,7 @@ impl<'a> From<&'a str> for Text<'a> {
 impl Text<'_> {
   pub fn new() -> Self { Text::default() }
 
-  pub fn push(&mut self, text: impl fmt::Display, color: AlphaColor<Srgb>) {
+  pub fn push(&mut self, text: impl fmt::Display, color: AlphaColor<Oklab>) {
     let start = self.text.len();
     std::fmt::write(self.text.to_mut(), format_args!("{text}")).unwrap();
     let end = self.text.len();
@@ -153,7 +159,7 @@ impl Text<'_> {
     builder.push_default(parley::StyleProperty::FontSize(12.0 * scale as f32));
 
     for range in self.ranges {
-      builder.push(parley::StyleProperty::Brush(range.1.into()), range.0);
+      builder.push(parley::StyleProperty::Brush(copy_ok_to_srgb(range.1).into()), range.0);
     }
 
     builder.build(&self.text)
@@ -167,11 +173,11 @@ impl Render<'_> {
     Affine::scale(self.scale.into()) * Affine::translate(self.offset)
   }
 
-  pub fn stroke(&mut self, shape: &impl kurbo::Shape, color: AlphaColor<Srgb>) {
-    self.scene.stroke(&Stroke::new(2.0), self.transform(), &color, None, &shape);
+  pub fn stroke(&mut self, shape: &impl kurbo::Shape, color: AlphaColor<Oklab>) {
+    self.scene.stroke(&Stroke::new(2.0), self.transform(), &copy_ok_to_srgb(color), None, &shape);
   }
 
-  pub fn draw_button(&mut self, rect: &kurbo::Rect, color: AlphaColor<Srgb>) {
+  pub fn draw_button(&mut self, rect: &kurbo::Rect, color: AlphaColor<Oklab>) {
     let rect = *rect + self.offset;
     let mut quad = Quad::from(rect);
 
@@ -180,8 +186,8 @@ impl Render<'_> {
     {
       quad = Quad::new_tilted(rect, cursor, 12_f64.to_radians(), 100.0);
 
-      let start = oklch(0.6, 0.1529, 259.41);
-      let end = oklch(0.6, 0.1801, 283.76);
+      let start = copy_ok_to_srgb(oklch(0.6, 0.1529, 259.41));
+      let end = copy_ok_to_srgb(oklch(0.6, 0.1801, 283.76));
       Brush::Gradient(Gradient::new_linear(cursor, rect.center()).with_stops([start, end]))
     } else if let Some(cursor) = self.cursor {
       let dx = (rect.x0 - cursor.x).max(cursor.x - rect.x1).max(0.0);
@@ -194,9 +200,9 @@ impl Render<'_> {
         quad = Quad::new_tilted(rect, cursor, 12_f64.to_radians() * weight, 100.0);
       }
 
-      color.into()
+      copy_ok_to_srgb(color).into()
     } else {
-      color.into()
+      copy_ok_to_srgb(color).into()
     };
 
     self.scene.stroke(
@@ -208,8 +214,13 @@ impl Render<'_> {
     );
   }
 
-  pub fn draw_text<'a>(&mut self, origin: Point, text: impl Into<Text<'a>>, color: Color) -> Rect {
-    let mut layout = text.into().layout(&mut self.store, color.into(), self.scale);
+  pub fn draw_text<'a>(
+    &mut self,
+    origin: Point,
+    text: impl Into<Text<'a>>,
+    color: AlphaColor<Oklab>,
+  ) -> Rect {
+    let mut layout = text.into().layout(&mut self.store, copy_ok_to_srgb(color).into(), self.scale);
 
     layout.break_all_lines(None);
     layout.align(None, parley::Alignment::Start, parley::AlignmentOptions::default());
