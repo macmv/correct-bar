@@ -1,22 +1,16 @@
-use cb_bar::{Module, Updater};
-use cb_core::{Color, Render};
-use crossbeam_channel::Receiver;
+use cb_bar::{Module, TextLayout, Updater};
+use cb_core::{Color, Render, Text};
 use libpulse_sys as sys;
 use parking_lot::Mutex;
 use std::{
   ffi::{CStr, CString, c_void},
-  fmt,
-  mem::ManuallyDrop,
-  ptr,
+  fmt, ptr,
   sync::Arc,
 };
 
 pub struct Pulse {
-  pub color: Color,
-}
-
-struct PulseModule {
-  spec: Pulse,
+  pub primary:   Color,
+  pub secondary: Color,
 }
 
 struct MainLoop {
@@ -551,10 +545,6 @@ impl fmt::Debug for Volume {
   }
 }
 
-impl From<Pulse> for Box<dyn Module> {
-  fn from(value: Pulse) -> Self { Box::new(PulseModule::new(value)) }
-}
-
 static CONTEXT: Mutex<Option<Arc<Context>>> = Mutex::new(None);
 
 fn context() -> Arc<Context> {
@@ -593,12 +583,51 @@ fn context() -> Arc<Context> {
   ctx
 }
 
-impl PulseModule {
-  pub fn new(spec: Pulse) -> Self { PulseModule { spec } }
+struct PulseModule {
+  spec: Pulse,
+  text: Option<TextLayout>,
+}
+
+impl From<Pulse> for Box<dyn Module> {
+  fn from(spec: Pulse) -> Self { Box::new(PulseModule { spec, text: None }) }
+}
+
+static STATE: Mutex<PulseState> = Mutex::new(PulseState { volume: 0 });
+
+struct PulseState {
+  volume: u32,
+}
+
+fn set_callback() {
+  use std::sync::atomic::*;
+
+  static SETUP: AtomicBool = AtomicBool::new(false);
+
+  if !SETUP.swap(true, Ordering::SeqCst) {
+    let ctx = context();
+
+    ctx.set_on_change(|| {
+      context().get_sink_info_list(|info| {
+        STATE.lock().volume = info.volume().value_percents()[0];
+      });
+    });
+  }
 }
 
 impl Module for PulseModule {
   fn updater(&self) -> Updater { Updater::None }
-  fn layout(&mut self, _layout: &mut cb_bar::Layout) {}
-  fn render(&self, _ctx: &mut Render) {}
+  fn layout(&mut self, layout: &mut cb_bar::Layout) {
+    set_callback();
+
+    let mut text = Text::new();
+    text.push(format_args!("{}", STATE.lock().volume), self.spec.primary);
+    text.push("%", self.spec.secondary);
+
+    self.text = Some(layout.layout_text(text, self.spec.primary));
+  }
+  fn render(&self, ctx: &mut Render) {
+    if let Some(text) = &self.text {
+      ctx.draw(text);
+    }
+  }
 }
