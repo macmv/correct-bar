@@ -286,7 +286,7 @@ struct MemModule {
 
 impl From<Mem> for Box<dyn Module> {
   fn from(spec: Mem) -> Self {
-    Box::new(MemModule { spec, hover: Animation::ease_in_out(0.2), text: None })
+    Box::new(MemModule { spec, hover: Animation::ease_out(0.2), text: None })
   }
 }
 
@@ -328,16 +328,22 @@ impl Module for MemModule {
     layout.pad(5.0);
   }
   fn render(&self, ctx: &mut Render) {
-    self.hover.advance(ctx.delta_time());
+    self.hover.advance(ctx.frame_time());
 
     if let Some(text) = &self.text {
       ctx.draw(text);
 
+      let min_x = text.bounds().min_x();
+      let max_x = text.bounds().max_x();
+
       ctx.stroke(
         &Line::new(
-          Point::new(text.bounds().min_x(), text.bounds().max_y().round() + 4.0),
           Point::new(
-            self.hover.interpolate(text.bounds().min_x(), text.bounds().max_x()),
+            self.hover.interpolate((min_x + max_x) / 2.0, min_x),
+            text.bounds().max_y().round() + 4.0,
+          ),
+          Point::new(
+            self.hover.interpolate((min_x + max_x) / 2.0, max_x),
             text.bounds().max_y().round() + 4.0,
           ),
         ),
