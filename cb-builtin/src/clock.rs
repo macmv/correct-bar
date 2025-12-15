@@ -1,8 +1,7 @@
 use cb_bar::Module;
-use cb_core::Text;
+use cb_core::{Color, Text};
 use chrono::{Datelike, Timelike};
 use kurbo::Point;
-use peniko::Color;
 
 #[derive(Clone)]
 pub struct Clock {
@@ -26,28 +25,28 @@ impl Module for ClockModule {
     let utc = local.naive_utc();
 
     let mut text = Text::new();
-    text.push(&local.weekday().to_string(), Color::WHITE.convert());
-    text.push(", ", self.spec.secondary.convert());
+    text.push(&local.weekday().to_string(), Color::WHITE);
+    text.push(", ", self.spec.secondary);
     text.push(
       &format_args!("{:04}-{:02}-{:02}", local.year(), local.month(), local.day()),
-      Color::WHITE.convert(),
+      Color::WHITE,
     );
-    text.push(" at ", self.spec.secondary.convert());
+    text.push(" at ", self.spec.secondary);
 
     macro_rules! draw_time {
       ( $time:expr ) => {
         text.push(
           &format_args!("{:02}:{:02}:{:02}", $time.hour(), $time.minute(), $time.second()),
-          Color::WHITE.convert(),
+          Color::WHITE,
         )
       };
     }
 
     draw_time!(local);
-    text.push(" or ", self.spec.secondary.convert());
+    text.push(" or ", self.spec.secondary);
     draw_time!(utc);
 
-    ctx.draw_text(Point::new(5.0, 8.0), text, self.spec.secondary.convert());
+    ctx.draw_text(Point::new(5.0, 8.0), text, self.spec.secondary);
 
     /*
     fn copy(str: String) {

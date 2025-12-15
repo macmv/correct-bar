@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::HashMap, fmt, ops::Range};
 use kurbo::{Affine, Point, Rect, Stroke, Vec2};
 use parley::{FontContext, LayoutContext};
 use peniko::{
-  Brush, Color, Fill, Gradient,
+  Brush, Fill, Gradient,
   color::{AlphaColor, Oklab, Oklch, OpaqueColor, Srgb},
 };
 use vello::{RenderParams, Scene};
@@ -15,6 +15,8 @@ pub use wgpu;
 
 mod blitter;
 mod quad;
+
+pub type Color = AlphaColor<Oklab>;
 
 pub struct RenderStore {
   font:   FontContext,
@@ -123,13 +125,13 @@ impl RenderStore {
   }
 }
 
-fn oklch(l: f32, c: f32, h: f32) -> AlphaColor<Oklab> {
+fn oklch(l: f32, c: f32, h: f32) -> Color {
   OpaqueColor::<Oklch>::new([l, c, h]).with_alpha(1.0).convert()
 }
 
 /// Converts things to sRGB, so that vello uses OkLAB for everything, and then
 /// we undo this conversion in the blitter.
-fn encode_color(color: AlphaColor<Oklab>) -> AlphaColor<Srgb> {
+fn encode_color(color: Color) -> AlphaColor<Srgb> {
   let [l, a, b, alpha] = color.components;
 
   AlphaColor::new([l, a + 0.5, b + 0.5, alpha])
@@ -138,7 +140,7 @@ fn encode_color(color: AlphaColor<Oklab>) -> AlphaColor<Srgb> {
 #[derive(Default)]
 pub struct Text<'a> {
   text:   Cow<'a, str>,
-  ranges: Vec<(Range<usize>, AlphaColor<Oklab>)>,
+  ranges: Vec<(Range<usize>, Color)>,
 }
 
 impl<'a> From<&'a str> for Text<'a> {
@@ -148,7 +150,7 @@ impl<'a> From<&'a str> for Text<'a> {
 impl Text<'_> {
   pub fn new() -> Self { Text::default() }
 
-  pub fn push(&mut self, text: impl fmt::Display, color: AlphaColor<Oklab>) {
+  pub fn push(&mut self, text: impl fmt::Display, color: Color) {
     let start = self.text.len();
     std::fmt::write(self.text.to_mut(), format_args!("{text}")).unwrap();
     let end = self.text.len();
@@ -175,11 +177,11 @@ impl Render<'_> {
     Affine::scale(self.scale.into()) * Affine::translate(self.offset)
   }
 
-  pub fn stroke(&mut self, shape: &impl kurbo::Shape, color: AlphaColor<Oklab>) {
+  pub fn stroke(&mut self, shape: &impl kurbo::Shape, color: Color) {
     self.scene.stroke(&Stroke::new(2.0), self.transform(), &encode_color(color), None, &shape);
   }
 
-  pub fn draw_button(&mut self, rect: &kurbo::Rect, color: AlphaColor<Oklab>) {
+  pub fn draw_button(&mut self, rect: &kurbo::Rect, color: Color) {
     let rect = *rect + self.offset;
     let mut quad = Quad::from(rect);
 
@@ -216,12 +218,7 @@ impl Render<'_> {
     );
   }
 
-  pub fn draw_text<'a>(
-    &mut self,
-    origin: Point,
-    text: impl Into<Text<'a>>,
-    color: AlphaColor<Oklab>,
-  ) -> Rect {
+  pub fn draw_text<'a>(&mut self, origin: Point, text: impl Into<Text<'a>>, color: Color) -> Rect {
     let mut layout = text.into().layout(&mut self.store, encode_color(color).into(), self.scale);
 
     layout.break_all_lines(None);
@@ -276,7 +273,7 @@ impl Render<'_> {
         &self.scene,
         &bar.texture_view,
         &RenderParams {
-          base_color:          Color::from_rgba8(0, 0, 0, 0),
+          base_color:          encode_color(Color::BLACK.with_alpha(0.0)),
           width:               bar.texture.width(),
           height:              bar.texture.height(),
           antialiasing_method: vello::AaConfig::Msaa16,
