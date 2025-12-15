@@ -286,7 +286,7 @@ struct MemModule {
 
 impl From<Mem> for Box<dyn Module> {
   fn from(spec: Mem) -> Self {
-    Box::new(MemModule { spec, hover: Animation::linear(0.5), text: None })
+    Box::new(MemModule { spec, hover: Animation::ease_in_out(0.2), text: None })
   }
 }
 
