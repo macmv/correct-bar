@@ -2,10 +2,10 @@ use cb_core::{Color, Drawable, RenderStore, Text};
 use kurbo::{Point, Rect, Size};
 
 pub struct Layout<'a> {
-  store: &'a mut RenderStore,
-  scale: f64,
+  pub(crate) store: &'a mut RenderStore,
+  pub(crate) scale: f64,
 
-  bounds: Rect,
+  pub(crate) bounds: Rect,
 }
 
 pub struct TextLayout {

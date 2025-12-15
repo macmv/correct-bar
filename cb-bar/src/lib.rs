@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cb_core::{BarId, Render};
+use cb_core::{BarId, Render, RenderStore};
 use kurbo::{Rect, Size};
 
 mod layout;
@@ -54,7 +54,7 @@ struct App {
 pub fn run(config: Config) { cb_backend_wayland::setup::<App>(config); }
 
 impl Bar {
-  fn into_layout(self) -> BarLayout {
+  fn into_layout(self, store: &mut RenderStore) -> BarLayout {
     let mut layout = BarLayout {
       size:        Size::new(1920.0, 30.0),
       last_draw:   std::time::Instant::now(),
@@ -77,23 +77,25 @@ impl Bar {
         .collect(),
     };
 
-    layout.layout();
+    layout.layout(store);
 
     layout
   }
 }
 
 impl BarLayout {
-  fn layout(&mut self) {
+  fn layout(&mut self, store: &mut RenderStore) {
     let mut x = 0.0;
     for module in &mut self.left_modules {
-      module.bounds = Rect::new(x, 0.0, x + 50.0, self.size.height);
+      module.layout(store);
+      module.bounds.x0 += x;
+      module.bounds.x1 += x;
       x += module.bounds.size().width;
     }
 
     let mut x = 0.0;
     for module in &mut self.center_modules {
-      module.bounds = Rect::new(x, 0.0, x + 50.0, self.size.height);
+      module.layout(store);
       x += module.bounds.size().width;
     }
 
@@ -105,8 +107,10 @@ impl BarLayout {
 
     let mut x = self.size.width;
     for module in self.right_modules.iter_mut().rev() {
-      module.bounds = Rect::new(x - 240.0, 0.0, x, self.size.height);
+      module.layout(store);
       x -= module.bounds.size().width;
+      module.bounds.x0 += x;
+      module.bounds.x1 += x;
     }
   }
 
@@ -142,6 +146,12 @@ impl ModuleLayout {
       Updater::Every(interval) => elapsed > interval,
     }
   }
+
+  fn layout(&mut self, store: &mut RenderStore) {
+    let mut ctx = Layout { store, scale: 1.0, bounds: Rect::ZERO };
+    self.module.layout(&mut ctx);
+    self.bounds = ctx.bounds;
+  }
 }
 
 impl cb_core::App for App {
@@ -160,7 +170,7 @@ impl cb_core::App for App {
     width: u32,
     height: u32,
   ) {
-    self.bars.insert(id, (self.config.make_bar)().into_layout());
+    self.bars.insert(id, (self.config.make_bar)().into_layout(&mut self.render));
 
     self.render.create_bar(id, device, format, scale, width, height);
   }
