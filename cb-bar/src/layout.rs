@@ -15,7 +15,13 @@ pub struct TextLayout {
 }
 
 impl Layout<'_> {
-  pub fn layout_text<'a>(
+  pub fn pad(&mut self, gap: f64) { self.bounds.x1 += gap; }
+
+  pub fn layout_text<'a>(&mut self, text: impl Into<Text<'a>>, color: Color) -> TextLayout {
+    self.layout_text_at(Point::new(self.bounds.width(), 8.0), text, color)
+  }
+
+  pub fn layout_text_at<'a>(
     &mut self,
     origin: Point,
     text: impl Into<Text<'a>>,

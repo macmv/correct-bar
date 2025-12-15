@@ -10,7 +10,6 @@ use std::{
 
 use cb_bar::{Module, TextLayout, Updater};
 use cb_core::{Color, Render, Text};
-use kurbo::Point;
 
 thread_local! {
   static SYS: RefCell<Option<SystemInfo>> = RefCell::new(None);
@@ -238,6 +237,8 @@ impl From<Cpu> for Box<dyn Module> {
 impl Module for CpuModule {
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
+    layout.pad(5.0);
+
     SYS.with(|s| {
       let mut sys = s.borrow_mut();
       if sys.is_none() {
@@ -251,8 +252,10 @@ impl Module for CpuModule {
       text.push(format_args!("{:>2.00}", state.cpu.usage), self.spec.primary);
       text.push("%", self.spec.secondary);
 
-      self.text = Some(layout.layout_text(Point::new(0.0, 8.0), text, self.spec.primary));
+      self.text = Some(layout.layout_text(text, self.spec.primary));
     });
+
+    layout.pad(5.0);
   }
   fn render(&self, ctx: &mut Render) {
     if let Some(text) = &self.text {
@@ -278,6 +281,8 @@ impl From<Mem> for Box<dyn Module> {
 impl Module for MemModule {
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
+    layout.pad(5.0);
+
     SYS.with(|s| {
       let mut sys = s.borrow_mut();
       if sys.is_none() {
@@ -296,8 +301,10 @@ impl Module for MemModule {
         .push(format_args!("{:>5.02}", state.memory.total_mb as f64 / 1024_f64), self.spec.primary);
       text.push("G", self.spec.secondary);
 
-      self.text = Some(layout.layout_text(Point::new(0.0, 8.0), text, self.spec.primary));
+      self.text = Some(layout.layout_text(text, self.spec.primary));
     });
+
+    layout.pad(5.0);
   }
   fn render(&self, ctx: &mut Render) {
     if let Some(text) = &self.text {
