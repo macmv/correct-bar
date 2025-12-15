@@ -128,7 +128,10 @@ impl BarLayout {
   }
 
   fn draw(&mut self, render: &mut Render) {
-    self.last_draw = std::time::Instant::now();
+    let now = std::time::Instant::now();
+    let dt = now - self.last_draw;
+    self.last_draw = now;
+    render.set_delta_time(dt);
     self.force_dirty = false;
 
     for module in self.modules() {

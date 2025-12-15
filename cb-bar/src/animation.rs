@@ -1,43 +1,51 @@
+use std::cell::RefCell;
+
 pub struct Animation {
-  time:     f64,
   duration: f64,
-  state:    State,
+  state:    RefCell<State>,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-enum State {
+#[derive(Default)]
+struct State {
+  direction: Direction,
+  time:      f64,
+}
+
+#[derive(Clone, Copy, Default, PartialEq)]
+enum Direction {
+  #[default]
   Start,
   Running,
   Done,
 }
 
 impl Animation {
-  pub fn linear(duration: f64) -> Animation {
-    Animation { time: 0.0, duration, state: State::Start }
-  }
+  pub fn linear(duration: f64) -> Animation { Animation { duration, state: Default::default() } }
 
-  pub fn is_running(&self) -> bool { self.state == State::Running }
+  pub fn is_running(&self) -> bool { self.state.borrow().direction == Direction::Running }
 
   pub fn interpolate(&self, start: f64, end: f64) -> f64 {
-    let t = self.time / self.duration;
+    let t = self.state.borrow().time / self.duration;
     start + (end - start) * t
   }
 
   pub fn start(&mut self) {
-    self.time = 0.0;
-    self.state = State::Running;
+    let state = self.state.get_mut();
+    state.time = 0.0;
+    state.direction = Direction::Running;
   }
 
-  pub fn advance(&mut self, dt: std::time::Duration) {
-    if self.state != State::Running {
+  pub fn advance(&self, dt: std::time::Duration) {
+    let mut state = self.state.borrow_mut();
+    if state.direction != Direction::Running {
       return;
     }
 
-    self.time += dt.as_secs_f64();
+    state.time += dt.as_secs_f64();
 
-    if self.time >= self.duration {
-      self.time = self.duration;
-      self.state = State::Done;
+    if state.time >= self.duration {
+      state.time = self.duration;
+      state.direction = Direction::Done;
     }
   }
 }

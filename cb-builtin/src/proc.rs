@@ -322,9 +322,15 @@ impl Module for MemModule {
       self.text = Some(layout.layout_text(text, self.spec.primary));
     });
 
+    if !self.hover.is_running() {
+      self.hover.start();
+    }
+
     layout.pad(5.0);
   }
   fn render(&self, ctx: &mut Render) {
+    self.hover.advance(ctx.delta_time());
+
     if let Some(text) = &self.text {
       ctx.draw(text);
 

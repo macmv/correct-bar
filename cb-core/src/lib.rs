@@ -45,6 +45,7 @@ pub struct Render<'a> {
   scale:  f64,
   cursor: Option<Point>,
 
+  dt:     std::time::Duration,
   offset: Vec2,
 
   store: &'a mut RenderStore,
@@ -92,6 +93,7 @@ impl RenderStore {
     if let Some(bar) = self.bars.get(&id) {
       Some(Render {
         bar:    id,
+        dt:     std::time::Duration::ZERO,
         scale:  bar.scale.into(),
         cursor: bar.cursor,
         offset: Vec2::ZERO,
@@ -208,7 +210,12 @@ impl Brush {
 }
 
 impl Render<'_> {
+  #[doc(hidden)]
+  pub fn set_delta_time(&mut self, dt: std::time::Duration) { self.dt = dt; }
+  #[doc(hidden)]
   pub fn set_offset(&mut self, offset: Vec2) { self.offset = offset; }
+
+  pub fn delta_time(&self) -> std::time::Duration { self.dt }
 
   fn transform(&self) -> Affine {
     Affine::scale(self.scale.into()) * Affine::translate(self.offset)
