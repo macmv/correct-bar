@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+  collections::HashMap,
+  ops::{Index, IndexMut},
+};
 
 use cb_core::{BarId, Render, RenderStore};
 use kurbo::{Point, Rect, Size};
@@ -28,12 +31,25 @@ pub struct Bar {
   pub right_modules:  Vec<Box<dyn Module>>,
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum Side {
+  Left,
+  Center,
+  Right,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+struct ModuleKey {
+  side:  Side,
+  index: usize,
+}
+
 struct BarLayout {
   size:        Size,
   scale:       f64,
   last_draw:   std::time::Instant,
   force_dirty: bool,
-  hover:       Option<usize>,
+  hover:       Option<ModuleKey>,
 
   left_modules:   Vec<ModuleLayout>,
   center_modules: Vec<ModuleLayout>,
@@ -144,32 +160,32 @@ impl BarLayout {
   }
 
   fn move_mouse(&mut self, pos: Option<(f64, f64)>) {
-    self.force_dirty = true;
-
-    if let Some(pos) = pos {
+    let new_hover = if let Some(pos) = pos {
       let pos = Point::new(pos.0, pos.1);
 
-      let hover = self.hover;
-      let mut new_hover = None;
+      self.module_keys().find(|&k| self[k].bounds.contains(pos))
+    } else {
+      None
+    };
 
-      for (i, m) in self.modules_mut().enumerate() {
-        if m.bounds.contains(pos) {
-          if hover != Some(i) {
-            new_hover = Some(i);
-            m.module.on_hover(true);
-          }
-        } else {
-          if hover == Some(i) {
-            m.module.on_hover(false);
-          }
-        }
+    if new_hover != self.hover {
+      if let Some(hover) = self.hover {
+        self[hover].module.on_hover(false);
+      }
+      if let Some(hover) = new_hover {
+        self[hover].module.on_hover(true);
       }
 
-      if new_hover != self.hover {
-        self.hover = new_hover;
-        self.force_dirty = true;
-      }
+      self.hover = new_hover;
+      self.force_dirty = true;
     }
+  }
+
+  fn module_keys(&self) -> impl Iterator<Item = ModuleKey> {
+    (0..self.left_modules.len())
+      .map(|i| ModuleKey { side: Side::Left, index: i })
+      .chain((0..self.center_modules.len()).map(|i| ModuleKey { side: Side::Center, index: i }))
+      .chain((0..self.right_modules.len()).map(|i| ModuleKey { side: Side::Right, index: i }))
   }
 
   fn modules(&self) -> impl Iterator<Item = &ModuleLayout> {
@@ -182,6 +198,28 @@ impl BarLayout {
       .iter_mut()
       .chain(self.center_modules.iter_mut())
       .chain(self.right_modules.iter_mut())
+  }
+}
+
+impl Index<ModuleKey> for BarLayout {
+  type Output = ModuleLayout;
+
+  fn index(&self, index: ModuleKey) -> &Self::Output {
+    match index.side {
+      Side::Left => &self.left_modules[index.index],
+      Side::Center => &self.center_modules[index.index],
+      Side::Right => &self.right_modules[index.index],
+    }
+  }
+}
+
+impl IndexMut<ModuleKey> for BarLayout {
+  fn index_mut(&mut self, index: ModuleKey) -> &mut Self::Output {
+    match index.side {
+      Side::Left => &mut self.left_modules[index.index],
+      Side::Center => &mut self.center_modules[index.index],
+      Side::Right => &mut self.right_modules[index.index],
+    }
   }
 }
 
