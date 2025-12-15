@@ -10,6 +10,7 @@ pub struct Layout<'a> {
 
 pub struct TextLayout {
   origin: Point,
+  scale:  f64,
   layout: parley::Layout<peniko::Brush>,
 }
 
@@ -26,7 +27,7 @@ impl Layout<'_> {
     layout.break_all_lines(None);
     layout.align(None, parley::Alignment::Start, parley::AlignmentOptions::default());
 
-    let layout = TextLayout { origin, layout };
+    let layout = TextLayout { origin, scale: self.scale, layout };
 
     self.bounds = self.bounds.union(Rect::from_origin_size(origin, layout.size()));
 
@@ -40,6 +41,6 @@ impl Drawable for TextLayout {
 
 impl TextLayout {
   pub fn size(&self) -> Size {
-    Size::new(f64::from(self.layout.full_width()), f64::from(self.layout.height()))
+    Size::new(f64::from(self.layout.full_width()), f64::from(self.layout.height())) / self.scale
   }
 }
