@@ -191,14 +191,6 @@ impl BarLayout {
   fn modules(&self) -> impl Iterator<Item = &ModuleLayout> {
     self.left_modules.iter().chain(self.center_modules.iter()).chain(self.right_modules.iter())
   }
-
-  fn modules_mut(&mut self) -> impl Iterator<Item = &mut ModuleLayout> {
-    self
-      .left_modules
-      .iter_mut()
-      .chain(self.center_modules.iter_mut())
-      .chain(self.right_modules.iter_mut())
-  }
 }
 
 impl Index<ModuleKey> for BarLayout {
