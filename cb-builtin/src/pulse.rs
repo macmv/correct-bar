@@ -261,6 +261,7 @@ impl PropList {
     }
   }
 
+  #[allow(dead_code)]
   pub fn set(&mut self, k: &str, v: &str) {
     unsafe {
       let k = CString::new(k).unwrap();
