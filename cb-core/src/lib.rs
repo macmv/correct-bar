@@ -7,13 +7,13 @@ use peniko::{
   color::{AlphaColor, Oklch, OpaqueColor, Srgb},
 };
 use vello::{RenderParams, Scene};
-use wgpu::util::TextureBlitter;
 
-use crate::quad::Quad;
+use crate::{blitter::TextureBlitterConvert, quad::Quad};
 
 pub use cb_common::{App, BarId};
 pub use wgpu;
 
+mod blitter;
 mod quad;
 
 pub struct RenderStore {
@@ -27,7 +27,7 @@ pub struct RenderStore {
 
 struct Bar {
   scale:        f32,
-  blitter:      TextureBlitter,
+  blitter:      TextureBlitterConvert,
   texture:      wgpu::Texture,
   texture_view: wgpu::TextureView,
 
@@ -77,9 +77,7 @@ impl RenderStore {
     });
     let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-    let blitter = wgpu::util::TextureBlitterBuilder::new(&device, surface_format)
-      .blend_state(wgpu::BlendState::ALPHA_BLENDING)
-      .build();
+    let blitter = TextureBlitterConvert::new(&device, surface_format);
 
     self.bars.insert(id, Bar { scale, texture, texture_view, blitter, cursor: None });
   }
