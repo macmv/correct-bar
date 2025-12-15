@@ -5,7 +5,9 @@ use libpulse_sys as sys;
 use parking_lot::Mutex;
 use std::{
   ffi::{CStr, CString, c_void},
-  fmt, ptr,
+  fmt,
+  mem::ManuallyDrop,
+  ptr,
   sync::Arc,
 };
 
@@ -168,6 +170,30 @@ impl Context {
     }
     unsafe {
       sys::pa_context_set_state_callback(self.pa, Some(cb), ptr::null_mut());
+    }
+  }
+
+  pub fn set_on_change(&self, callback: impl Fn() + Send + 'static) {
+    extern "C" fn cb(
+      _ctx: *mut sys::pa_context,
+      _ev: sys::pa_subscription_event_type_t,
+      _idx: u32,
+      ptr: *mut c_void,
+    ) {
+      unsafe {
+        let cb = &*ptr.cast::<Box<dyn Fn() + Send + 'static>>();
+        cb();
+      }
+    }
+
+    unsafe {
+      let ptr: &mut Box<dyn Fn() + Send + 'static> = Box::leak(Box::new(Box::new(callback)));
+      sys::pa_context_set_subscribe_callback(
+        self.pa,
+        Some(cb),
+        std::ptr::from_mut(ptr) as *mut c_void,
+      );
+      sys::pa_context_subscribe(self.pa, sys::PA_SUBSCRIPTION_MASK_SINK, None, ptr::null_mut());
     }
   }
 
@@ -592,6 +618,14 @@ mod tests {
     });
 
     ready_rx.recv().unwrap();
+    ctx.set_on_change({
+      let c = ctx.clone();
+      move || {
+        c.get_sink_info_list(move |info| {
+          dbg!(&info);
+        });
+      }
+    });
 
     std::thread::park();
   }
