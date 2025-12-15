@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::HashMap, fmt, ops::Range};
 use kurbo::{Affine, Point, Rect, Stroke, Vec2};
 use parley::{FontContext, LayoutContext};
 use peniko::{
-  Brush, Fill, Gradient,
+  Fill, Gradient,
   color::{AlphaColor, Oklab, Oklch, OpaqueColor, Srgb},
 };
 use vello::{RenderParams, Scene};
@@ -157,7 +157,12 @@ impl Text<'_> {
     self.ranges.push((start..end, color));
   }
 
-  pub fn layout(self, store: &mut RenderStore, brush: Brush, scale: f64) -> parley::Layout<Brush> {
+  pub fn layout(
+    self,
+    store: &mut RenderStore,
+    brush: peniko::Brush,
+    scale: f64,
+  ) -> parley::Layout<peniko::Brush> {
     let mut builder = store.layout.ranged_builder(&mut store.font, &self.text, 1.0, false);
     builder.push_default(parley::StyleProperty::Brush(brush));
     builder.push_default(parley::StyleProperty::FontSize(12.0 * scale as f32));
@@ -172,6 +177,30 @@ impl Text<'_> {
 
 pub trait Drawable {
   fn draw(&self, ctx: &mut Render);
+}
+
+pub enum Brush {
+  Solid(Color),
+  Gradient(Gradient),
+}
+
+impl From<Color> for Brush {
+  fn from(value: Color) -> Self { Brush::Solid(value) }
+}
+
+impl Brush {
+  fn encode(self) -> peniko::Brush {
+    match self {
+      Brush::Solid(color) => peniko::Brush::Solid(encode_color(color)),
+      Brush::Gradient(mut gradient) => {
+        for stop in gradient.stops.as_mut() {
+          stop.color = encode_color(stop.color.to_alpha_color()).into();
+        }
+
+        peniko::Brush::Gradient(gradient)
+      }
+    }
+  }
 }
 
 impl Render<'_> {
@@ -196,8 +225,8 @@ impl Render<'_> {
     {
       quad = Quad::new_tilted(rect, cursor, 12_f64.to_radians(), 100.0);
 
-      let start = encode_color(oklch(0.6, 0.1529, 259.41));
-      let end = encode_color(oklch(0.6, 0.1801, 283.76));
+      let start = oklch(0.6, 0.1529, 259.41);
+      let end = oklch(0.6, 0.1801, 283.76);
       Brush::Gradient(Gradient::new_linear(cursor, rect.center()).with_stops([start, end]))
     } else if let Some(cursor) = self.cursor {
       let dx = (rect.x0 - cursor.x).max(cursor.x - rect.x1).max(0.0);
@@ -210,15 +239,15 @@ impl Render<'_> {
         quad = Quad::new_tilted(rect, cursor, 12_f64.to_radians() * weight, 100.0);
       }
 
-      encode_color(color).into()
+      color.into()
     } else {
-      encode_color(color).into()
+      color.into()
     };
 
     self.scene.stroke(
       &Stroke::new(2.0),
       kurbo::Affine::scale(self.scale.into()),
-      &brush,
+      &brush.encode(),
       None,
       &quad,
     );
@@ -233,7 +262,11 @@ impl Render<'_> {
     self.draw_text_layout(origin, &layout)
   }
 
-  pub fn draw_text_layout(&mut self, origin: Point, layout: &parley::Layout<Brush>) -> Rect {
+  pub fn draw_text_layout(
+    &mut self,
+    origin: Point,
+    layout: &parley::Layout<peniko::Brush>,
+  ) -> Rect {
     let mut rect = Rect::new(0.0, 0.0, f64::from(layout.width()), f64::from(layout.height()));
 
     for line in layout.lines() {
