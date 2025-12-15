@@ -1,4 +1,4 @@
-use cb_core::{Color, RenderStore, Text};
+use cb_core::{Color, Drawable, RenderStore, Text};
 use kurbo::{Point, Rect, Size};
 
 pub struct Layout<'a> {
@@ -9,6 +9,7 @@ pub struct Layout<'a> {
 }
 
 pub struct TextLayout {
+  origin: Point,
   layout: parley::Layout<peniko::Brush>,
 }
 
@@ -25,12 +26,16 @@ impl Layout<'_> {
     layout.break_all_lines(None);
     layout.align(None, parley::Alignment::Start, parley::AlignmentOptions::default());
 
-    let layout = TextLayout { layout };
+    let layout = TextLayout { origin, layout };
 
     self.bounds = self.bounds.union(Rect::from_origin_size(origin, layout.size()));
 
     layout
   }
+}
+
+impl Drawable for TextLayout {
+  fn draw(&self, ctx: &mut cb_core::Render) { ctx.draw_text_layout(self.origin, &self.layout); }
 }
 
 impl TextLayout {

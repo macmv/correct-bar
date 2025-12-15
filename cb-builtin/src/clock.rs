@@ -1,4 +1,4 @@
-use cb_bar::Module;
+use cb_bar::{Module, TextLayout};
 use cb_core::{Color, Text};
 use chrono::{Datelike, Timelike};
 use kurbo::Point;
@@ -11,17 +11,17 @@ pub struct Clock {
 
 struct ClockModule {
   spec: Clock,
+  text: Option<TextLayout>,
 }
 
 impl From<Clock> for Box<dyn Module> {
-  fn from(spec: Clock) -> Self { Box::new(ClockModule { spec }) }
+  fn from(spec: Clock) -> Self { Box::new(ClockModule { spec, text: None }) }
 }
 
 impl Module for ClockModule {
   fn updater(&self) -> cb_bar::Updater { cb_bar::Updater::Every(std::time::Duration::from_secs(1)) }
 
-  fn layout(&mut self, layout: &mut cb_bar::Layout) {}
-  fn render(&self, ctx: &mut cb_core::Render) {
+  fn layout(&mut self, layout: &mut cb_bar::Layout) {
     let local = chrono::Local::now();
     let utc = local.naive_utc();
 
@@ -47,7 +47,13 @@ impl Module for ClockModule {
     text.push(" or ", self.spec.secondary);
     draw_time!(utc);
 
-    ctx.draw_text(Point::new(5.0, 8.0), text, self.spec.secondary);
+    self.text = Some(layout.layout_text(Point::new(5.0, 8.0), text, self.spec.secondary));
+  }
+
+  fn render(&self, ctx: &mut cb_core::Render) {
+    if let Some(ref text) = self.text {
+      ctx.draw(text);
+    }
 
     /*
     fn copy(str: String) {

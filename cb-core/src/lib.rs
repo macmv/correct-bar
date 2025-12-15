@@ -170,6 +170,10 @@ impl Text<'_> {
   }
 }
 
+pub trait Drawable {
+  fn draw(&self, ctx: &mut Render);
+}
+
 impl Render<'_> {
   pub fn set_offset(&mut self, offset: Vec2) { self.offset = offset; }
 
@@ -180,6 +184,8 @@ impl Render<'_> {
   pub fn stroke(&mut self, shape: &impl kurbo::Shape, color: Color) {
     self.scene.stroke(&Stroke::new(2.0), self.transform(), &encode_color(color), None, &shape);
   }
+
+  pub fn draw(&mut self, drawable: &impl Drawable) { drawable.draw(self); }
 
   pub fn draw_button(&mut self, rect: &kurbo::Rect, color: Color) {
     let rect = *rect + self.offset;
@@ -224,6 +230,10 @@ impl Render<'_> {
     layout.break_all_lines(None);
     layout.align(None, parley::Alignment::Start, parley::AlignmentOptions::default());
 
+    self.draw_text_layout(origin, &layout)
+  }
+
+  pub fn draw_text_layout(&mut self, origin: Point, layout: &parley::Layout<Brush>) -> Rect {
     let mut rect = Rect::new(0.0, 0.0, f64::from(layout.width()), f64::from(layout.height()));
 
     for line in layout.lines() {
@@ -261,7 +271,7 @@ impl Render<'_> {
     rect.scale_from_origin(1.0 / self.scale) + origin.to_vec2()
   }
 
-  pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Texture) {
+  pub fn render(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, surface: &wgpu::Texture) {
     let bar = &self.store.bars[&self.bar];
 
     self

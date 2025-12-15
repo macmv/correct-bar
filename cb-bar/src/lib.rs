@@ -5,7 +5,7 @@ use kurbo::{Rect, Size};
 
 mod layout;
 
-pub use layout::Layout;
+pub use layout::{Layout, TextLayout};
 
 pub trait Module {
   fn updater(&self) -> Updater { Updater::None }
@@ -182,7 +182,7 @@ impl cb_core::App for App {
     if let Some(mut render) = self.render.for_bar(id) {
       self.bars.get_mut(&id).unwrap().draw(&mut render);
 
-      render.draw(device, queue, output);
+      render.render(device, queue, output);
     }
   }
 
