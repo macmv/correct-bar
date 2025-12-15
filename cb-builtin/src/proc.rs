@@ -10,6 +10,7 @@ use std::{
 
 use cb_bar::{Module, TextLayout, Updater};
 use cb_core::{Color, Render, Text};
+use kurbo::{Line, Point};
 
 thread_local! {
   static SYS: RefCell<Option<SystemInfo>> = RefCell::new(None);
@@ -260,6 +261,14 @@ impl Module for CpuModule {
   fn render(&self, ctx: &mut Render) {
     if let Some(text) = &self.text {
       ctx.draw(text);
+
+      ctx.stroke(
+        &Line::new(
+          Point::new(text.bounds().min_x(), text.bounds().max_y().round() + 4.0),
+          Point::new(text.bounds().max_x(), text.bounds().max_y().round() + 4.0),
+        ),
+        self.spec.primary,
+      );
     }
   }
 }
@@ -309,6 +318,14 @@ impl Module for MemModule {
   fn render(&self, ctx: &mut Render) {
     if let Some(text) = &self.text {
       ctx.draw(text);
+
+      ctx.stroke(
+        &Line::new(
+          Point::new(text.bounds().min_x(), text.bounds().max_y().round() + 4.0),
+          Point::new(text.bounds().max_x(), text.bounds().max_y().round() + 4.0),
+        ),
+        self.spec.primary,
+      );
     }
   }
 }

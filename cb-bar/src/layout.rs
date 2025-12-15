@@ -35,7 +35,7 @@ impl Layout<'_> {
 
     let layout = TextLayout { origin, scale: self.scale, layout };
 
-    self.bounds = self.bounds.union(Rect::from_origin_size(origin, layout.size()));
+    self.bounds = self.bounds.union(layout.bounds());
 
     layout
   }
@@ -46,6 +46,8 @@ impl Drawable for TextLayout {
 }
 
 impl TextLayout {
+  pub fn bounds(&self) -> Rect { Rect::from_origin_size(self.origin, self.size()) }
+
   pub fn size(&self) -> Size {
     Size::new(f64::from(self.layout.full_width()), f64::from(self.layout.height())) / self.scale
   }
