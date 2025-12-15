@@ -10,7 +10,15 @@ pub struct Clock {
   pub secondary: Color,
 }
 
-impl Module for Clock {
+struct ClockModule {
+  spec: Clock,
+}
+
+impl From<Clock> for Box<dyn Module> {
+  fn from(spec: Clock) -> Self { Box::new(ClockModule { spec }) }
+}
+
+impl Module for ClockModule {
   fn updater(&self) -> cb_bar::Updater { cb_bar::Updater::Every(std::time::Duration::from_secs(1)) }
 
   fn render(&self, ctx: &mut cb_core::Render) {
@@ -19,12 +27,12 @@ impl Module for Clock {
 
     let mut text = Text::new();
     text.push(&local.weekday().to_string(), Color::WHITE);
-    text.push(", ", self.secondary);
+    text.push(", ", self.spec.secondary);
     text.push(
       &format_args!("{:04}-{:02}-{:02}", local.year(), local.month(), local.day()),
       Color::WHITE,
     );
-    text.push(" at ", self.secondary);
+    text.push(" at ", self.spec.secondary);
 
     macro_rules! draw_time {
       ( $time:expr ) => {
@@ -36,10 +44,10 @@ impl Module for Clock {
     }
 
     draw_time!(local);
-    text.push(" or ", self.secondary);
+    text.push(" or ", self.spec.secondary);
     draw_time!(utc);
 
-    ctx.draw_text(Point::new(5.0, 8.0), text, self.secondary);
+    ctx.draw_text(Point::new(5.0, 8.0), text, self.spec.secondary);
 
     /*
     fn copy(str: String) {
