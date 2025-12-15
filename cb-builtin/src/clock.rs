@@ -47,11 +47,11 @@ impl Module for ClockModule {
     text.push(" or ", self.spec.secondary);
     draw_time!(utc);
 
-    self.text = Some(layout.layout_text(Point::new(5.0, 8.0), text, self.spec.secondary));
+    self.text = Some(layout.layout_text(Point::new(0.0, 8.0), text, self.spec.secondary));
   }
 
   fn render(&self, ctx: &mut cb_core::Render) {
-    if let Some(ref text) = self.text {
+    if let Some(text) = &self.text {
       ctx.draw(text);
     }
 

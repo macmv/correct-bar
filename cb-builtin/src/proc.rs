@@ -8,7 +8,7 @@ use std::{
   time::{Duration, Instant},
 };
 
-use cb_bar::{Module, Updater};
+use cb_bar::{Module, TextLayout, Updater};
 use cb_core::{Color, Render, Text};
 use kurbo::Point;
 
@@ -226,15 +226,18 @@ pub struct Cpu {
   pub primary:   Color,
   pub secondary: Color,
 }
-
-impl From<Cpu> for Box<dyn Module> {
-  fn from(spec: Cpu) -> Self { Box::new(spec) }
+struct CpuModule {
+  spec: Cpu,
+  text: Option<TextLayout>,
 }
 
-impl Module for Cpu {
+impl From<Cpu> for Box<dyn Module> {
+  fn from(spec: Cpu) -> Self { Box::new(CpuModule { spec, text: None }) }
+}
+
+impl Module for CpuModule {
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
-  fn layout(&mut self, layout: &mut cb_bar::Layout) {}
-  fn render(&self, ctx: &mut Render) {
+  fn layout(&mut self, layout: &mut cb_bar::Layout) {
     SYS.with(|s| {
       let mut sys = s.borrow_mut();
       if sys.is_none() {
@@ -245,11 +248,16 @@ impl Module for Cpu {
       let state = sys.state();
 
       let mut text = Text::new();
-      text.push(format_args!("{:>2.00}", state.cpu.usage), self.primary);
-      text.push("%", self.secondary);
+      text.push(format_args!("{:>2.00}", state.cpu.usage), self.spec.primary);
+      text.push("%", self.spec.secondary);
 
-      ctx.draw_text(Point::new(0.0, 8.0), text, self.primary);
+      self.text = Some(layout.layout_text(Point::new(0.0, 8.0), text, self.spec.primary));
     });
+  }
+  fn render(&self, ctx: &mut Render) {
+    if let Some(text) = &self.text {
+      ctx.draw(text);
+    }
   }
 }
 
@@ -258,15 +266,18 @@ pub struct Mem {
   pub primary:   Color,
   pub secondary: Color,
 }
-
-impl From<Mem> for Box<dyn Module> {
-  fn from(spec: Mem) -> Self { Box::new(spec) }
+struct MemModule {
+  spec: Mem,
+  text: Option<TextLayout>,
 }
 
-impl Module for Mem {
+impl From<Mem> for Box<dyn Module> {
+  fn from(spec: Mem) -> Self { Box::new(MemModule { spec, text: None }) }
+}
+
+impl Module for MemModule {
   fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
-  fn layout(&mut self, layout: &mut cb_bar::Layout) {}
-  fn render(&self, ctx: &mut Render) {
+  fn layout(&mut self, layout: &mut cb_bar::Layout) {
     SYS.with(|s| {
       let mut sys = s.borrow_mut();
       if sys.is_none() {
@@ -278,12 +289,19 @@ impl Module for Mem {
 
       let mut text = Text::new();
 
-      text.push(format_args!("{:>5.02}", state.memory.used_mb as f64 / 1024_f64), self.primary);
-      text.push("G / ", self.secondary);
-      text.push(format_args!("{:>5.02}", state.memory.total_mb as f64 / 1024_f64), self.primary);
-      text.push("G", self.secondary);
+      text
+        .push(format_args!("{:>5.02}", state.memory.used_mb as f64 / 1024_f64), self.spec.primary);
+      text.push("G / ", self.spec.secondary);
+      text
+        .push(format_args!("{:>5.02}", state.memory.total_mb as f64 / 1024_f64), self.spec.primary);
+      text.push("G", self.spec.secondary);
 
-      ctx.draw_text(Point::new(0.0, 8.0), text, self.primary);
+      self.text = Some(layout.layout_text(Point::new(0.0, 8.0), text, self.spec.primary));
     });
+  }
+  fn render(&self, ctx: &mut Render) {
+    if let Some(text) = &self.text {
+      ctx.draw(text);
+    }
   }
 }
