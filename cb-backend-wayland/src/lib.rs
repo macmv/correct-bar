@@ -312,6 +312,14 @@ impl<A: cb_common::App> Dispatch<wl_pointer::WlPointer, ()> for AppData<A> {
         state.pointer_surface = None;
       }
 
+      wl_pointer::Event::Button { state: s, .. } => {
+        if matches!(s.into_result(), Ok(wl_pointer::ButtonState::Pressed)) {
+          if let Some(bar) = state.pointer_bar() {
+            state.gpu.click_mouse(bar);
+          }
+        }
+      }
+
       wl_pointer::Event::Motion { surface_x, surface_y, .. } => {
         if let Some(bar) = state.pointer_bar() {
           state.gpu.move_mouse(bar, Some((surface_x, surface_y)));

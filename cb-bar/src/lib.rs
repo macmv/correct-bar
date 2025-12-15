@@ -15,6 +15,7 @@ pub use layout::{Layout, TextLayout};
 pub trait Module {
   fn updater(&self) -> Updater { Updater::None }
   fn on_hover(&mut self, hover: bool) { let _ = hover; }
+  fn on_click(&mut self, cursor: Point) { let _ = cursor; }
   fn layout(&mut self, layout: &mut Layout);
   fn render(&self, render: &mut Render);
 }
@@ -178,6 +179,16 @@ impl BarLayout {
     }
   }
 
+  fn click_mouse(&mut self, pos: (f64, f64)) {
+    let pos = Point::new(pos.0, pos.1);
+    let Some(hover) = self.module_keys().find(|&k| self[k].bounds.contains(pos)) else {
+      return;
+    };
+
+    let m = &mut self[hover];
+    m.module.on_click(pos - m.bounds.origin().to_vec2());
+  }
+
   fn module_keys(&self) -> impl Iterator<Item = ModuleKey> {
     (0..self.left_modules.len())
       .map(|i| ModuleKey { side: Side::Left, index: i })
@@ -255,6 +266,10 @@ impl cb_core::App for App {
     self.bars.get_mut(&id).unwrap().move_mouse(pos);
 
     self.render.move_mouse(id, pos);
+  }
+
+  fn click_mouse(&mut self, id: BarId, pos: (f64, f64)) {
+    self.bars.get_mut(&id).unwrap().click_mouse(pos);
   }
 
   fn draw(

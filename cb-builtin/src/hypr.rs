@@ -8,6 +8,7 @@ use std::{
 
 use cb_bar::{Module, TextLayout};
 use cb_core::Color;
+use kurbo::Point;
 
 #[derive(Clone)]
 pub struct Hypr {
@@ -21,6 +22,7 @@ struct HyprModule {
 }
 
 struct WorkspaceLayout {
+  id:      String,
   text:    TextLayout,
   focused: bool,
 }
@@ -198,12 +200,22 @@ impl Module for HyprModule {
 
       let color = if workspace.focused { self.spec.primary } else { self.spec.secondary };
       self.workspaces.push(WorkspaceLayout {
+        id:      workspace.id.clone(),
         text:    layout.layout_text(&workspace.name, color),
         focused: workspace.focused,
       });
     }
 
     layout.pad(10.0);
+  }
+
+  fn on_click(&mut self, cursor: Point) {
+    for workspace in &self.workspaces {
+      if workspace.text.bounds().inflate(5.0, 0.0).contains(cursor) {
+        Connection::from_env().req(&format!("dispatch workspace {}", workspace.id));
+        STATE.lock().unwrap().focus_workspace(&workspace.id);
+      }
+    }
   }
 
   fn render(&self, ctx: &mut cb_core::Render) {

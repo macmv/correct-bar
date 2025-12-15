@@ -8,7 +8,8 @@ pub struct Gpu<A> {
 
   bars: HashMap<BarId, Bar>,
 
-  app: A,
+  app:    A,
+  cursor: Option<(f64, f64)>,
 }
 
 pub trait App {
@@ -26,6 +27,7 @@ pub trait App {
   );
   fn dirty(&self, id: BarId) -> bool;
   fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>);
+  fn click_mouse(&mut self, id: BarId, pos: (f64, f64));
   fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: i32);
   fn draw(&mut self, id: BarId, device: &wgpu::Device, queue: &wgpu::Queue, output: &wgpu::Texture);
 }
@@ -59,7 +61,7 @@ impl<A: App> Gpu<A> {
 
     let app = A::new(config, &device);
 
-    Gpu { instance, adapter, device, queue, bars: HashMap::new(), app }
+    Gpu { instance, adapter, device, queue, bars: HashMap::new(), app, cursor: None }
   }
 
   pub fn instance(&self) -> &wgpu::Instance { &self.instance }
@@ -107,7 +109,15 @@ impl<A: App> Gpu<A> {
     self.app.create_bar(id, &self.device, surface_format, scale, width, height);
   }
 
-  pub fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) { self.app.move_mouse(id, pos); }
+  pub fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) {
+    self.cursor = pos;
+    self.app.move_mouse(id, pos);
+  }
+  pub fn click_mouse(&mut self, id: BarId) {
+    if let Some(pos) = self.cursor {
+      self.app.click_mouse(id, pos);
+    }
+  }
 
   pub fn needs_render(&self) -> bool { self.bars.keys().any(|id| self.app.dirty(*id)) }
 
