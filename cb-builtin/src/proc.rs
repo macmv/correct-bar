@@ -11,6 +11,7 @@ use std::{
 use cb_bar::{Animation, Module, TextLayout, Updater};
 use cb_core::{Color, Render, Text};
 use kurbo::{Line, Point};
+use peniko::Gradient;
 
 thread_local! {
   static SYS: RefCell<Option<SystemInfo>> = RefCell::new(None);
@@ -336,18 +337,22 @@ impl Module for MemModule {
       let min_x = text.bounds().min_x();
       let max_x = text.bounds().max_x();
 
+      let start = Point::new(
+        self.hover.interpolate((min_x + max_x) / 2.0, min_x),
+        text.bounds().max_y().round() + 4.0,
+      );
+      let end = Point::new(
+        self.hover.interpolate((min_x + max_x) / 2.0, max_x),
+        text.bounds().max_y().round() + 4.0,
+      );
+
       ctx.stroke(
-        &Line::new(
-          Point::new(
-            self.hover.interpolate((min_x + max_x) / 2.0, min_x),
-            text.bounds().max_y().round() + 4.0,
-          ),
-          Point::new(
-            self.hover.interpolate((min_x + max_x) / 2.0, max_x),
-            text.bounds().max_y().round() + 4.0,
-          ),
-        ),
-        self.spec.primary,
+        &Line::new(start, end),
+        Gradient::new_linear(start, end).with_stops([
+          self.spec.primary,
+          self.spec.primary.map_lightness(|l| l + 0.1),
+          self.spec.primary,
+        ]),
       );
     }
   }
