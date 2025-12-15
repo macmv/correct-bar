@@ -331,7 +331,10 @@ impl Module for MemModule {
       ctx.stroke(
         &Line::new(
           Point::new(text.bounds().min_x(), text.bounds().max_y().round() + 4.0),
-          Point::new(text.bounds().max_x(), text.bounds().max_y().round() + 4.0),
+          Point::new(
+            self.hover.interpolate(text.bounds().min_x(), text.bounds().max_x()),
+            text.bounds().max_y().round() + 4.0,
+          ),
         ),
         self.spec.primary,
       );

@@ -18,6 +18,11 @@ impl Animation {
 
   pub fn is_running(&self) -> bool { self.state == State::Running }
 
+  pub fn interpolate(&self, start: f64, end: f64) -> f64 {
+    let t = self.time / self.duration;
+    start + (end - start) * t
+  }
+
   pub fn start(&mut self) {
     self.time = 0.0;
     self.state = State::Running;
@@ -31,6 +36,7 @@ impl Animation {
     self.time += dt.as_secs_f64();
 
     if self.time >= self.duration {
+      self.time = self.duration;
       self.state = State::Done;
     }
   }
