@@ -136,13 +136,22 @@ impl BarLayout {
     }
   }
 
-  fn dirty(&self) -> bool {
+  fn layout_dirty(&self) -> bool {
     if self.force_dirty {
       return true;
     }
 
     let elapsed = self.last_draw.elapsed();
-    self.modules().any(|m| m.dirty(elapsed))
+    self.modules().any(|m| m.layout_dirty(elapsed))
+  }
+
+  fn render_dirty(&self) -> bool {
+    if self.force_dirty {
+      return true;
+    }
+
+    let elapsed = self.last_draw.elapsed();
+    self.modules().any(|m| m.render_dirty(elapsed))
   }
 
   fn draw(&mut self, render: &mut Render) {
@@ -222,7 +231,14 @@ impl IndexMut<ModuleKey> for BarLayout {
 }
 
 impl ModuleLayout {
-  fn dirty(&self, elapsed: std::time::Duration) -> bool {
+  fn layout_dirty(&self, elapsed: std::time::Duration) -> bool {
+    match self.module.updater() {
+      Updater::None => false,
+      Updater::Animation => false,
+      Updater::Every(interval) => elapsed > interval,
+    }
+  }
+  fn render_dirty(&self, elapsed: std::time::Duration) -> bool {
     match self.module.updater() {
       Updater::None => false,
       Updater::Animation => true,
@@ -267,7 +283,7 @@ impl cb_core::App for App {
     self.render.create_bar(id, device, format, scale, width, height);
   }
 
-  fn dirty(&self, id: BarId) -> bool { self.bars.get(&id).unwrap().dirty() }
+  fn dirty(&self, id: BarId) -> bool { self.bars.get(&id).unwrap().render_dirty() }
 
   fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>) {
     self.bars.get_mut(&id).unwrap().move_mouse(pos);
@@ -286,7 +302,9 @@ impl cb_core::App for App {
     queue: &cb_core::wgpu::Queue,
     output: &cb_core::wgpu::Texture,
   ) {
-    self.bars.get_mut(&id).unwrap().layout(&mut self.render, &self.waker);
+    if self.bars.get(&id).unwrap().layout_dirty() {
+      self.bars.get_mut(&id).unwrap().layout(&mut self.render, &self.waker);
+    }
 
     if let Some(mut render) = self.render.for_bar(id) {
       self.bars.get_mut(&id).unwrap().draw(&mut render);
