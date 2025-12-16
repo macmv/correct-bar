@@ -5,7 +5,7 @@ use parking_lot::Mutex;
 use std::{
   ffi::{CStr, CString, c_void},
   fmt, ptr,
-  sync::Arc,
+  sync::{Arc, atomic::AtomicU32},
 };
 
 pub struct Pulse {
@@ -585,15 +585,17 @@ fn context() -> Arc<Context> {
 }
 
 struct PulseModule {
-  spec: Pulse,
-  text: Option<TextLayout>,
+  spec:      Pulse,
+  text:      Option<TextLayout>,
+  last_seen: u32,
 }
 
 impl From<Pulse> for Box<dyn Module> {
-  fn from(spec: Pulse) -> Self { Box::new(PulseModule { spec, text: None }) }
+  fn from(spec: Pulse) -> Self { Box::new(PulseModule { spec, text: None, last_seen: 0 }) }
 }
 
 static STATE: Mutex<PulseState> = Mutex::new(PulseState { volume: 0 });
+static UPDATE: AtomicU32 = AtomicU32::new(0);
 
 struct PulseState {
   volume: u32,
@@ -612,6 +614,7 @@ fn set_callback(waker: &Arc<Waker>) {
       let w = waker.clone();
       context().get_sink_info_list(move |info| {
         STATE.lock().volume = info.volume().value_percents()[0];
+        UPDATE.fetch_add(1, Ordering::SeqCst);
         w.wake();
       });
     });
@@ -619,9 +622,16 @@ fn set_callback(waker: &Arc<Waker>) {
 }
 
 impl Module for PulseModule {
-  fn updater(&self) -> Updater { Updater::None }
+  fn updater(&self) -> Updater {
+    if self.last_seen < UPDATE.load(std::sync::atomic::Ordering::SeqCst) {
+      Updater::Animation
+    } else {
+      Updater::None
+    }
+  }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
     set_callback(layout.waker);
+    self.last_seen = UPDATE.load(std::sync::atomic::Ordering::SeqCst);
 
     let mut text = Text::new();
     text.push(format_args!("{}", STATE.lock().volume), self.spec.primary);
