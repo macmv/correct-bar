@@ -612,7 +612,6 @@ fn set_callback(waker: &Arc<Waker>) {
       let w = waker.clone();
       context().get_sink_info_list(move |info| {
         STATE.lock().volume = info.volume().value_percents()[0];
-        println!("WAKE");
         w.wake();
       });
     });

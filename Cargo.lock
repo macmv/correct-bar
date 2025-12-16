@@ -120,7 +120,7 @@ name = "cb-backend-wayland"
 version = "0.1.0"
 dependencies = [
  "cb-common",
- "rustix",
+ "libc",
  "wayland-backend",
  "wayland-client",
  "wayland-protocols",

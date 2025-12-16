@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ptr::NonNull};
+use std::{collections::HashMap, os::fd::AsRawFd, ptr::NonNull};
 
 use cb_common::{BarId, Gpu};
 use wayland_client::{
@@ -427,56 +427,61 @@ fn blocking_read(
   waker: Option<&cb_common::Waker>,
   timeout: Option<std::time::Duration>,
 ) -> Result<usize, wayland_backend::client::WaylandError> {
-  let fd = guard.connection_fd();
-  let waker_fd;
+  let mut fds: [libc::pollfd; 2] = unsafe { std::mem::zeroed() };
 
-  let fds: &mut [rustix::event::PollFd] = if let Some(waker) = waker {
-    waker_fd = waker.fd();
-    &mut [
-      rustix::event::PollFd::new(&fd, rustix::event::PollFlags::IN | rustix::event::PollFlags::ERR),
-      rustix::event::PollFd::new(
-        &waker_fd,
-        rustix::event::PollFlags::IN | rustix::event::PollFlags::ERR,
-      ),
-    ]
-  } else {
-    &mut [rustix::event::PollFd::new(
-      &fd,
-      rustix::event::PollFlags::IN | rustix::event::PollFlags::ERR,
-    )]
-  };
+  fds[0].fd = guard.connection_fd().as_raw_fd();
+  fds[0].events = libc::POLLIN | libc::POLLERR;
+  let mut n_fds = 1;
+
+  if let Some(waker) = waker {
+    fds[1].fd = waker.fd().as_raw_fd();
+    fds[1].events = libc::POLLIN | libc::POLLERR;
+    n_fds = 2;
+  }
 
   loop {
-    match rustix::event::poll(
-      fds,
-      timeout
-        .map(|t| rustix::fs::Timespec { tv_sec: t.as_secs() as _, tv_nsec: t.subsec_nanos() as _ })
-        .as_ref(),
-    ) {
-      Ok(i) => {
-        if i == 1
-          && let Some(waker) = waker
-        {
-          waker.clear();
-        }
+    let ret = unsafe {
+      libc::poll(&mut fds as *mut _, n_fds, timeout.map(|t| t.as_millis() as _).unwrap_or(-1))
+    };
 
-        dbg!(i);
-        break;
+    if ret == -1 {
+      let err = std::io::Error::last_os_error();
+      match err.kind() {
+        std::io::ErrorKind::Interrupted => continue,
+        _ => return Err(wayland_backend::client::WaylandError::Io(err)),
       }
-      Err(rustix::io::Errno::INTR) => continue,
-      Err(e) => return Err(wayland_backend::client::WaylandError::Io(e.into())),
+    }
+
+    break;
+  }
+
+  let mut res = Ok(0);
+
+  let mut guard = Some(guard);
+  for (i, fd) in fds.iter().enumerate() {
+    if fd.revents == 0 {
+      continue;
+    }
+
+    match i {
+      0 => {
+        res = match guard.take().unwrap().read() {
+          Ok(n) => Ok(n),
+          // if we are still "wouldblock", just return 0; the caller will retry.
+          Err(wayland_backend::client::WaylandError::Io(e))
+            if e.kind() == std::io::ErrorKind::WouldBlock =>
+          {
+            Ok(0)
+          }
+          Err(e) => Err(e),
+        }
+      }
+
+      1 => waker.as_ref().unwrap().clear(),
+
+      _ => unreachable!(),
     }
   }
 
-  // at this point the fd is ready
-  match guard.read() {
-    Ok(n) => Ok(n),
-    // if we are still "wouldblock", just return 0; the caller will retry.
-    Err(wayland_backend::client::WaylandError::Io(e))
-      if e.kind() == std::io::ErrorKind::WouldBlock =>
-    {
-      Ok(0)
-    }
-    Err(e) => Err(e),
-  }
+  res
 }
