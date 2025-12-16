@@ -10,7 +10,7 @@ use vello::{RenderParams, Scene};
 
 use crate::{blitter::TextureBlitterConvert, quad::Quad};
 
-pub use cb_common::{App, BarId};
+pub use cb_common::{App, BarId, Waker};
 pub use wgpu;
 
 mod blitter;

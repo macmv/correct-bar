@@ -1,4 +1,8 @@
-use std::collections::HashMap;
+use std::{
+  collections::HashMap,
+  os::fd::{AsRawFd, BorrowedFd, FromRawFd, OwnedFd},
+  sync::Arc,
+};
 
 pub struct Gpu<A> {
   instance: wgpu::Instance,
@@ -10,12 +14,34 @@ pub struct Gpu<A> {
 
   app:    A,
   cursor: Option<(f64, f64)>,
+
+  pub waker: Option<Arc<Waker>>,
+}
+
+pub struct Waker {
+  fd: OwnedFd,
+}
+impl Waker {
+  pub fn new() -> Self {
+    unsafe {
+      let fd = libc::eventfd(0, 0);
+
+      if fd < 0 {
+        panic!("eventfd");
+      }
+
+      Waker { fd: OwnedFd::from_raw_fd(fd) }
+    }
+  }
+
+  pub fn fd(&self) -> BorrowedFd<'_> { unsafe { BorrowedFd::borrow_raw(self.fd.as_raw_fd()) } }
 }
 
 pub trait App {
   type Config;
 
   fn new(config: Self::Config, device: &wgpu::Device) -> Self;
+  fn waker(&self) -> Option<Arc<Waker>>;
   fn create_bar(
     &mut self,
     id: BarId,
@@ -60,8 +86,9 @@ impl<A: App> Gpu<A> {
     let (device, queue) = pollster::block_on(adapter.request_device(&Default::default())).unwrap();
 
     let app = A::new(config, &device);
+    let waker = app.waker();
 
-    Gpu { instance, adapter, device, queue, bars: HashMap::new(), app, cursor: None }
+    Gpu { instance, adapter, device, queue, bars: HashMap::new(), app, cursor: None, waker }
   }
 
   pub fn instance(&self) -> &wgpu::Instance { &self.instance }

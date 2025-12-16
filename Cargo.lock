@@ -157,6 +157,7 @@ dependencies = [
 name = "cb-common"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "pollster",
  "wgpu",
 ]

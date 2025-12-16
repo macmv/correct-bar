@@ -414,7 +414,8 @@ pub fn setup<A: cb_common::App + 'static>(config: A::Config) {
     event_queue.flush().unwrap();
 
     if let Some(guard) = event_queue.prepare_read() {
-      blocking_read(guard, Some(std::time::Duration::from_secs(1))).unwrap();
+      blocking_read(guard, app.gpu.waker.as_deref(), Some(std::time::Duration::from_secs(1)))
+        .unwrap();
     }
   }
 }
@@ -423,15 +424,30 @@ pub fn setup<A: cb_common::App + 'static>(config: A::Config) {
 // timeout.
 fn blocking_read(
   guard: wayland_backend::client::ReadEventsGuard,
+  waker: Option<&cb_common::Waker>,
   timeout: Option<std::time::Duration>,
 ) -> Result<usize, wayland_backend::client::WaylandError> {
   let fd = guard.connection_fd();
-  let mut fds =
-    [rustix::event::PollFd::new(&fd, rustix::event::PollFlags::IN | rustix::event::PollFlags::ERR)];
+  let waker_fd;
+  let fds: &mut [rustix::event::PollFd] = if let Some(waker) = waker {
+    waker_fd = waker.fd();
+    &mut [
+      rustix::event::PollFd::new(&fd, rustix::event::PollFlags::IN | rustix::event::PollFlags::ERR),
+      rustix::event::PollFd::new(
+        &waker_fd,
+        rustix::event::PollFlags::IN | rustix::event::PollFlags::ERR,
+      ),
+    ]
+  } else {
+    &mut [rustix::event::PollFd::new(
+      &fd,
+      rustix::event::PollFlags::IN | rustix::event::PollFlags::ERR,
+    )]
+  };
 
   loop {
     match rustix::event::poll(
-      &mut fds,
+      fds,
       timeout
         .map(|t| rustix::fs::Timespec { tv_sec: t.as_secs() as _, tv_nsec: t.subsec_nanos() as _ })
         .as_ref(),

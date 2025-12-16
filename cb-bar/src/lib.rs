@@ -1,9 +1,10 @@
 use std::{
   collections::HashMap,
   ops::{Index, IndexMut},
+  sync::Arc,
 };
 
-use cb_core::{BarId, Render, RenderStore};
+use cb_core::{BarId, Render, RenderStore, Waker};
 use kurbo::{Point, Rect, Size};
 
 mod animation;
@@ -71,6 +72,7 @@ struct App {
   bars:   HashMap<BarId, BarLayout>,
 
   render: cb_core::RenderStore,
+  waker:  Arc<cb_core::Waker>,
 }
 
 pub fn run(config: Config) { cb_backend_wayland::setup::<App>(config); }
@@ -243,8 +245,15 @@ impl cb_core::App for App {
   type Config = Config;
 
   fn new(config: Config, device: &cb_core::wgpu::Device) -> Self {
-    App { config, bars: HashMap::new(), render: cb_core::RenderStore::new(device) }
+    App {
+      config,
+      bars: HashMap::new(),
+      render: cb_core::RenderStore::new(device),
+      waker: Arc::new(Waker::new()),
+    }
   }
+
+  fn waker(&self) -> Option<Arc<Waker>> { Some(self.waker.clone()) }
 
   fn create_bar(
     &mut self,
