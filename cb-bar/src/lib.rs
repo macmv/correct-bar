@@ -107,18 +107,34 @@ impl Bar {
 
 impl BarLayout {
   fn layout(&mut self, store: &mut RenderStore, waker: &Arc<Waker>) {
+    let elapsed = std::time::Instant::now().duration_since(self.last_draw);
+
     let mut x = 0.0;
     for module in &mut self.left_modules {
-      module.layout(store, self.scale, waker);
-      module.bounds.x0 += x;
-      module.bounds.x1 += x;
-      x += module.bounds.size().width;
+      if self.force_dirty || module.layout_dirty(elapsed) {
+        module.layout(store, self.scale, waker);
+        module.bounds.x0 += x;
+        module.bounds.x1 += x;
+        x += module.bounds.size().width;
+      } else {
+        let width = module.bounds.size().width;
+        module.bounds.x0 = x;
+        module.bounds.x1 = x + width;
+        x += width;
+      }
     }
 
     let mut x = 0.0;
     for module in &mut self.center_modules {
-      module.layout(store, self.scale, waker);
-      x += module.bounds.size().width;
+      if self.force_dirty || module.layout_dirty(elapsed) {
+        module.layout(store, self.scale, waker);
+        x += module.bounds.size().width;
+      } else {
+        let width = module.bounds.size().width;
+        module.bounds.x0 = 0.0;
+        module.bounds.x1 = width;
+        x += width;
+      }
     }
 
     let offset = self.size.width - x / 2.0;
@@ -129,10 +145,17 @@ impl BarLayout {
 
     let mut x = self.size.width;
     for module in self.right_modules.iter_mut().rev() {
-      module.layout(store, self.scale, waker);
-      x -= module.bounds.size().width;
-      module.bounds.x0 += x;
-      module.bounds.x1 += x;
+      if self.force_dirty || module.layout_dirty(elapsed) {
+        module.layout(store, self.scale, waker);
+        x -= module.bounds.size().width;
+        module.bounds.x0 += x;
+        module.bounds.x1 += x;
+      } else {
+        let width = module.bounds.size().width;
+        module.bounds.x1 = x;
+        x -= width;
+        module.bounds.x0 = x;
+      }
     }
   }
 
@@ -316,6 +339,7 @@ impl cb_core::App for App {
   fn set_scale(&mut self, id: BarId, device: &cb_core::wgpu::Device, factor: i32) {
     self.render.set_scale(id, device, factor);
     self.bars.get_mut(&id).unwrap().scale = factor as f64;
+    self.bars.get_mut(&id).unwrap().force_dirty = true;
     self.bars.get_mut(&id).unwrap().layout(&mut self.render, &self.waker);
   }
 }
