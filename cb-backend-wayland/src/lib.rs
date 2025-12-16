@@ -429,6 +429,7 @@ fn blocking_read(
 ) -> Result<usize, wayland_backend::client::WaylandError> {
   let fd = guard.connection_fd();
   let waker_fd;
+
   let fds: &mut [rustix::event::PollFd] = if let Some(waker) = waker {
     waker_fd = waker.fd();
     &mut [
@@ -452,7 +453,16 @@ fn blocking_read(
         .map(|t| rustix::fs::Timespec { tv_sec: t.as_secs() as _, tv_nsec: t.subsec_nanos() as _ })
         .as_ref(),
     ) {
-      Ok(_) => break,
+      Ok(i) => {
+        if i == 1
+          && let Some(waker) = waker
+        {
+          waker.clear();
+        }
+
+        dbg!(i);
+        break;
+      }
       Err(rustix::io::Errno::INTR) => continue,
       Err(e) => return Err(wayland_backend::client::WaylandError::Io(e.into())),
     }

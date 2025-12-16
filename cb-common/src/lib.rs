@@ -30,11 +30,28 @@ impl Waker {
         panic!("eventfd");
       }
 
+      let flags = libc::fcntl(fd, libc::F_GETFL);
+      libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+
       Waker { fd: OwnedFd::from_raw_fd(fd) }
     }
   }
 
   pub fn fd(&self) -> BorrowedFd<'_> { unsafe { BorrowedFd::borrow_raw(self.fd.as_raw_fd()) } }
+
+  pub fn wake(&self) {
+    println!("WAKE");
+    unsafe {
+      libc::write(self.fd.as_raw_fd(), &1_u64 as *const _ as *const libc::c_void, 8);
+    }
+  }
+
+  pub fn clear(&self) {
+    println!("CLEAR");
+    unsafe {
+      libc::read(self.fd.as_raw_fd(), &mut 0_u64 as *mut _ as *mut libc::c_void, 8);
+    }
+  }
 }
 
 pub trait App {

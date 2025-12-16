@@ -1,5 +1,5 @@
 use cb_bar::{Module, TextLayout, Updater};
-use cb_core::{Color, Render, Text};
+use cb_core::{Color, Render, Text, Waker};
 use libpulse_sys as sys;
 use parking_lot::Mutex;
 use std::{
@@ -599,17 +599,21 @@ struct PulseState {
   volume: u32,
 }
 
-fn set_callback() {
+fn set_callback(waker: &Arc<Waker>) {
   use std::sync::atomic::*;
 
   static SETUP: AtomicBool = AtomicBool::new(false);
 
   if !SETUP.swap(true, Ordering::SeqCst) {
     let ctx = context();
+    let waker = waker.clone();
 
-    ctx.set_on_change(|| {
-      context().get_sink_info_list(|info| {
+    ctx.set_on_change(move || {
+      let w = waker.clone();
+      context().get_sink_info_list(move |info| {
         STATE.lock().volume = info.volume().value_percents()[0];
+        println!("WAKE");
+        w.wake();
       });
     });
   }
@@ -618,7 +622,7 @@ fn set_callback() {
 impl Module for PulseModule {
   fn updater(&self) -> Updater { Updater::None }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
-    set_callback();
+    set_callback(layout.waker);
 
     let mut text = Text::new();
     text.push(format_args!("{}", STATE.lock().volume), self.spec.primary);

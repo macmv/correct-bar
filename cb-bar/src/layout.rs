@@ -1,4 +1,6 @@
-use cb_core::{Color, Drawable, RenderStore, Text};
+use std::sync::Arc;
+
+use cb_core::{Color, Drawable, RenderStore, Text, Waker};
 use kurbo::{Point, Rect, Size};
 
 pub struct Layout<'a> {
@@ -6,6 +8,8 @@ pub struct Layout<'a> {
   pub(crate) scale: f64,
 
   pub(crate) bounds: Rect,
+
+  pub waker: &'a Arc<Waker>,
 }
 
 pub struct TextLayout {

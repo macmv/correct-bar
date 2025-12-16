@@ -78,8 +78,8 @@ struct App {
 pub fn run(config: Config) { cb_backend_wayland::setup::<App>(config); }
 
 impl Bar {
-  fn into_layout(self, store: &mut RenderStore, scale: f64) -> BarLayout {
-    let mut layout = BarLayout {
+  fn into_layout(self, scale: f64) -> BarLayout {
+    BarLayout {
       size: Size::new(1920.0, 30.0),
       scale,
       last_draw: std::time::Instant::now(),
@@ -101,19 +101,15 @@ impl Bar {
         .into_iter()
         .map(|m| ModuleLayout { module: m, bounds: Rect::ZERO })
         .collect(),
-    };
-
-    layout.layout(store);
-
-    layout
+    }
   }
 }
 
 impl BarLayout {
-  fn layout(&mut self, store: &mut RenderStore) {
+  fn layout(&mut self, store: &mut RenderStore, waker: &Arc<Waker>) {
     let mut x = 0.0;
     for module in &mut self.left_modules {
-      module.layout(store, self.scale);
+      module.layout(store, self.scale, waker);
       module.bounds.x0 += x;
       module.bounds.x1 += x;
       x += module.bounds.size().width;
@@ -121,7 +117,7 @@ impl BarLayout {
 
     let mut x = 0.0;
     for module in &mut self.center_modules {
-      module.layout(store, self.scale);
+      module.layout(store, self.scale, waker);
       x += module.bounds.size().width;
     }
 
@@ -133,7 +129,7 @@ impl BarLayout {
 
     let mut x = self.size.width;
     for module in self.right_modules.iter_mut().rev() {
-      module.layout(store, self.scale);
+      module.layout(store, self.scale, waker);
       x -= module.bounds.size().width;
       module.bounds.x0 += x;
       module.bounds.x1 += x;
@@ -234,8 +230,8 @@ impl ModuleLayout {
     }
   }
 
-  fn layout(&mut self, store: &mut RenderStore, scale: f64) {
-    let mut ctx = Layout { store, scale, bounds: Rect::ZERO };
+  fn layout(&mut self, store: &mut RenderStore, scale: f64, waker: &Arc<Waker>) {
+    let mut ctx = Layout { store, scale, bounds: Rect::ZERO, waker };
     self.module.layout(&mut ctx);
     self.bounds = ctx.bounds;
   }
@@ -264,7 +260,9 @@ impl cb_core::App for App {
     width: u32,
     height: u32,
   ) {
-    self.bars.insert(id, (self.config.make_bar)().into_layout(&mut self.render, f64::from(scale)));
+    let mut layout = (self.config.make_bar)().into_layout(f64::from(scale));
+    layout.layout(&mut self.render, &self.waker);
+    self.bars.insert(id, layout);
 
     self.render.create_bar(id, device, format, scale, width, height);
   }
@@ -288,7 +286,7 @@ impl cb_core::App for App {
     queue: &cb_core::wgpu::Queue,
     output: &cb_core::wgpu::Texture,
   ) {
-    self.bars.get_mut(&id).unwrap().layout(&mut self.render);
+    self.bars.get_mut(&id).unwrap().layout(&mut self.render, &self.waker);
 
     if let Some(mut render) = self.render.for_bar(id) {
       self.bars.get_mut(&id).unwrap().draw(&mut render);
@@ -300,6 +298,6 @@ impl cb_core::App for App {
   fn set_scale(&mut self, id: BarId, device: &cb_core::wgpu::Device, factor: i32) {
     self.render.set_scale(id, device, factor);
     self.bars.get_mut(&id).unwrap().scale = factor as f64;
-    self.bars.get_mut(&id).unwrap().layout(&mut self.render);
+    self.bars.get_mut(&id).unwrap().layout(&mut self.render, &self.waker);
   }
 }
