@@ -237,7 +237,7 @@ impl From<Cpu> for Box<dyn Module> {
 }
 
 impl Module for CpuModule {
-  fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
+  fn updater(&self) -> Updater<'_> { Updater::Every(Duration::from_secs(1)) }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
     layout.pad(5.0);
 
@@ -292,7 +292,7 @@ impl From<Mem> for Box<dyn Module> {
 }
 
 impl Module for MemModule {
-  fn updater(&self) -> Updater {
+  fn updater(&self) -> Updater<'_> {
     if self.hover.is_running() {
       Updater::Animation
     } else {

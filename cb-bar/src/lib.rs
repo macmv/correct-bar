@@ -1,7 +1,10 @@
 use std::{
   collections::HashMap,
   ops::{Index, IndexMut},
-  sync::Arc,
+  sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+  },
 };
 
 use cb_core::{BarId, Render, RenderStore, Waker};
@@ -14,17 +17,18 @@ pub use animation::Animation;
 pub use layout::{Layout, TextLayout};
 
 pub trait Module {
-  fn updater(&self) -> Updater { Updater::None }
+  fn updater(&self) -> Updater<'_> { Updater::None }
   fn on_hover(&mut self, hover: bool) { let _ = hover; }
   fn on_click(&mut self, cursor: Point) { let _ = cursor; }
   fn layout(&mut self, layout: &mut Layout);
   fn render(&self, render: &mut Render);
 }
 
-pub enum Updater {
+pub enum Updater<'a> {
   None,
   Animation,
   Every(std::time::Duration),
+  Atomic(&'a AtomicBool),
 }
 
 pub struct Bar {
@@ -259,6 +263,7 @@ impl ModuleLayout {
       Updater::None => false,
       Updater::Animation => false,
       Updater::Every(interval) => elapsed > interval,
+      Updater::Atomic(a) => a.load(Ordering::SeqCst),
     }
   }
   fn render_dirty(&self, elapsed: std::time::Duration) -> bool {
@@ -266,6 +271,7 @@ impl ModuleLayout {
       Updater::None => false,
       Updater::Animation => true,
       Updater::Every(interval) => elapsed > interval,
+      Updater::Atomic(a) => a.load(Ordering::SeqCst),
     }
   }
 

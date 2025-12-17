@@ -90,7 +90,7 @@ impl From<Temp> for Box<dyn Module> {
 }
 
 impl Module for TempModule {
-  fn updater(&self) -> Updater { Updater::Every(Duration::from_secs(1)) }
+  fn updater(&self) -> Updater<'_> { Updater::Every(Duration::from_secs(1)) }
   fn layout(&mut self, layout: &mut Layout) {
     layout.pad(5.0);
 

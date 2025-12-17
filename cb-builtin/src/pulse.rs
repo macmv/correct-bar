@@ -635,13 +635,7 @@ fn set_callback(waker: &Arc<Waker>) {
 }
 
 impl Module for PulseModule {
-  fn updater(&self) -> Updater {
-    if self.updated.load(std::sync::atomic::Ordering::SeqCst) {
-      Updater::Animation
-    } else {
-      Updater::None
-    }
-  }
+  fn updater(&self) -> Updater<'_> { Updater::Atomic(&self.updated) }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
     set_callback(layout.waker);
     self.updated.store(false, std::sync::atomic::Ordering::SeqCst);

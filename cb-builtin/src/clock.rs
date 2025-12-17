@@ -18,7 +18,9 @@ impl From<Clock> for Box<dyn Module> {
 }
 
 impl Module for ClockModule {
-  fn updater(&self) -> cb_bar::Updater { cb_bar::Updater::Every(std::time::Duration::from_secs(1)) }
+  fn updater(&self) -> cb_bar::Updater<'_> {
+    cb_bar::Updater::Every(std::time::Duration::from_secs(1))
+  }
 
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
     layout.pad(5.0);
