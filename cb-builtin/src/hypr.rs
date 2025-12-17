@@ -261,6 +261,12 @@ impl HyprState {
     self.workspaces = c.load_workspaces();
 
     self.workspaces.sort_by(|a, b| a.name.cmp(&b.name));
+
+    if let Some(focused) = self.monitors.iter().find(|m| m.focused) {
+      if let Some(w) = self.workspaces.iter_mut().find(|w| w.id == focused.active.id) {
+        w.focused = true;
+      }
+    }
   }
 
   fn destroy_workspace(&mut self, id: u32) { self.workspaces.retain(|w| w.id != id); }
