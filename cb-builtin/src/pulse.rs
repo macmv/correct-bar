@@ -585,9 +585,9 @@ fn context() -> Arc<Context> {
 }
 
 struct PulseModule {
-  spec:    Pulse,
-  text:    Option<TextLayout>,
-  updated: Arc<AtomicBool>,
+  spec:  Pulse,
+  text:  Option<TextLayout>,
+  dirty: Arc<AtomicBool>,
 }
 
 impl From<Pulse> for Box<dyn Module> {
@@ -596,7 +596,7 @@ impl From<Pulse> for Box<dyn Module> {
 
     UPDATERS.lock().push(Arc::downgrade(&updater));
 
-    Box::new(PulseModule { spec, text: None, updated: updater })
+    Box::new(PulseModule { spec, text: None, dirty: updater })
   }
 }
 
@@ -635,10 +635,10 @@ fn set_callback(waker: &Arc<Waker>) {
 }
 
 impl Module for PulseModule {
-  fn updater(&self) -> Updater<'_> { Updater::Atomic(&self.updated) }
+  fn updater(&self) -> Updater<'_> { Updater::Atomic(&self.dirty) }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
     set_callback(layout.waker);
-    self.updated.store(false, std::sync::atomic::Ordering::SeqCst);
+    self.dirty.store(false, std::sync::atomic::Ordering::SeqCst);
 
     let mut text = Text::new();
     text.push(format_args!("{}", STATE.lock().volume), self.spec.primary);
