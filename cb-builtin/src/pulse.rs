@@ -628,6 +628,8 @@ fn set_callback(waker: &Arc<Waker>) {
 impl Module for PulseModule {
   fn updater(&self) -> Updater<'_> { Updater::Atomic(self.dirty.get()) }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
+    layout.pad(5.0);
+
     set_callback(layout.waker);
     self.dirty.clear();
 
@@ -636,6 +638,8 @@ impl Module for PulseModule {
     text.push("%", self.spec.secondary);
 
     self.text = Some(layout.layout_text(text, self.spec.primary));
+
+    layout.pad(5.0);
   }
   fn render(&self, ctx: &mut Render) {
     if let Some(text) = &self.text {
