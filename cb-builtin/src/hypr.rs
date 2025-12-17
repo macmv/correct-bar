@@ -119,7 +119,6 @@ struct HyprState {
 /// ```
 #[derive(serde::Deserialize)]
 struct Monitor {
-  id:      u32,
   name:    String,
   #[serde(rename = "activeWorkspace")]
   active:  ActiveWorkspace,
@@ -148,9 +147,6 @@ struct ActiveWorkspace {
 struct Workspace {
   id:   u32,
   name: String,
-
-  #[serde(rename = "monitorID")]
-  monitor_id: u32,
 
   #[serde(skip)]
   focused: bool,
