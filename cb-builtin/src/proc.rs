@@ -276,7 +276,7 @@ impl Module for CpuModule {
 
       self.usage = state.cpu.cpus.clone();
 
-      layout.pad(5.0 + 6.0 * self.cols() as f64);
+      layout.pad(10.0 + 6.0 * self.cols() as f64);
       self.text = Some(layout.layout_text(text, self.spec.primary));
       layout.pad(5.0);
     });
@@ -310,7 +310,7 @@ impl Module for CpuModule {
             }
 
             ctx.stroke(
-              &Line::new((i as f64 * 6.0, y), (i as f64 * 6.0 + 3.0, y)),
+              &Line::new((5.0 + i as f64 * 6.0, y), (5.0 + i as f64 * 6.0 + 3.0, y)),
               self.spec.secondary.lerp(
                 self.spec.primary,
                 (self.usage[cpu] / 100.0) as f32,
