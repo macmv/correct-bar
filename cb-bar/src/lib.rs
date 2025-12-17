@@ -19,6 +19,7 @@ pub use layout::{Layout, TextLayout};
 pub trait Module {
   fn updater(&self) -> Updater<'_> { Updater::None }
   fn on_hover(&mut self, hover: bool) { let _ = hover; }
+  fn on_mouse(&mut self, cursor: Point) { let _ = cursor; }
   fn on_click(&mut self, cursor: Point) { let _ = cursor; }
   fn layout(&mut self, layout: &mut Layout);
   fn render(&self, render: &mut Render);
@@ -210,6 +211,13 @@ impl BarLayout {
 
       self.hover = new_hover;
       self.force_dirty = true;
+    }
+
+    if let Some(pos) = pos
+      && let Some(hover) = self.hover
+    {
+      let m = &mut self[hover];
+      m.module.on_mouse(Point::new(pos.0, pos.1) - m.bounds.origin().to_vec2());
     }
   }
 

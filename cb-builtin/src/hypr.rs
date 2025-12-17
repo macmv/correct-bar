@@ -1,6 +1,6 @@
 use parking_lot::Mutex;
 use std::{
-  cell::RefCell,
+  cell::{Cell, RefCell},
   io::{BufRead, BufReader, Read, Write},
   os::unix::net::UnixStream,
   path::PathBuf,
@@ -20,9 +20,10 @@ pub struct Hypr {
 }
 
 struct HyprModule {
-  spec:       Hypr,
-  workspaces: Vec<WorkspaceLayout>,
-  dirty:      Dirty,
+  spec:         Hypr,
+  workspaces:   Vec<WorkspaceLayout>,
+  dirty:        Dirty,
+  render_dirty: Cell<bool>,
 }
 
 struct WorkspaceLayout {
@@ -33,7 +34,12 @@ struct WorkspaceLayout {
 
 impl From<Hypr> for Box<dyn Module> {
   fn from(spec: Hypr) -> Self {
-    Box::new(HyprModule { spec, workspaces: vec![], dirty: UPDATERS.lock().add() })
+    Box::new(HyprModule {
+      spec,
+      workspaces: vec![],
+      dirty: UPDATERS.lock().add(),
+      render_dirty: Cell::new(false),
+    })
   }
 }
 
@@ -197,7 +203,15 @@ impl HyprState {
 }
 
 impl Module for HyprModule {
-  fn updater(&self) -> cb_bar::Updater<'_> { cb_bar::Updater::Atomic(self.dirty.get()) }
+  fn updater(&self) -> cb_bar::Updater<'_> {
+    if self.render_dirty.get() {
+      cb_bar::Updater::Animation
+    } else {
+      cb_bar::Updater::Atomic(self.dirty.get())
+    }
+  }
+
+  fn on_mouse(&mut self, _: Point) { self.render_dirty.set(true); }
 
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
     spawn_listener(layout.waker);
@@ -234,6 +248,8 @@ impl Module for HyprModule {
   }
 
   fn render(&self, ctx: &mut cb_core::Render) {
+    self.render_dirty.set(false);
+
     for workspace in &self.workspaces {
       ctx.draw_button(
         &workspace.text.bounds().inflate(5.0, 0.0),
