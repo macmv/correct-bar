@@ -1,5 +1,6 @@
 use cb_bar::{Module, TextLayout, Updater};
 use cb_core::{Color, Render, Text, Waker};
+use kurbo::Line;
 use libpulse_sys as sys;
 use parking_lot::Mutex;
 use std::{
@@ -587,14 +588,15 @@ fn context() -> Arc<Context> {
 }
 
 struct PulseModule {
-  spec:  Pulse,
-  text:  Option<TextLayout>,
-  dirty: Dirty,
+  spec:   Pulse,
+  text:   Option<TextLayout>,
+  dirty:  Dirty,
+  volume: u32,
 }
 
 impl From<Pulse> for Box<dyn Module> {
   fn from(spec: Pulse) -> Self {
-    Box::new(PulseModule { spec, text: None, dirty: UPDATERS.lock().add() })
+    Box::new(PulseModule { spec, text: None, dirty: UPDATERS.lock().add(), volume: 0 })
   }
 }
 
@@ -635,13 +637,15 @@ fn set_callback(waker: &Arc<Waker>) {
 impl Module for PulseModule {
   fn updater(&self) -> Updater<'_> { Updater::Atomic(self.dirty.get()) }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
-    layout.pad(5.0);
+    layout.pad(10.0);
 
     set_callback(layout.waker);
     self.dirty.clear();
 
+    self.volume = STATE.lock().volume;
+
     let mut text = Text::new();
-    text.push(format_args!("{}", STATE.lock().volume), self.spec.primary);
+    text.push(format_args!("{}", self.volume), self.spec.primary);
     text.push("%", self.spec.secondary);
 
     self.text = Some(layout.layout_text(text, self.spec.primary));
@@ -651,6 +655,17 @@ impl Module for PulseModule {
   fn render(&self, ctx: &mut Render) {
     if let Some(text) = &self.text {
       ctx.draw(text);
+
+      let min_y = text.bounds().y0 - 2.0;
+      let max_y = text.bounds().y1 + 2.0;
+      ctx.stroke(&Line::new((5.0, min_y), (5.0, max_y)), self.spec.secondary);
+
+      let fract = self.volume as f64 / 100.0;
+
+      ctx.stroke(
+        &Line::new((5.0, max_y - fract * (max_y - min_y)), (5.0, max_y)),
+        self.spec.primary,
+      );
     }
   }
 }
