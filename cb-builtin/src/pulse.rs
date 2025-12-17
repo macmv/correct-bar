@@ -5,8 +5,10 @@ use parking_lot::Mutex;
 use std::{
   ffi::{CStr, CString, c_void},
   fmt, ptr,
-  sync::{Arc, Weak, atomic::AtomicBool},
+  sync::Arc,
 };
+
+use crate::{Dirty, UpdateGroup};
 
 pub struct Pulse {
   pub primary:   Color,
@@ -587,21 +589,17 @@ fn context() -> Arc<Context> {
 struct PulseModule {
   spec:  Pulse,
   text:  Option<TextLayout>,
-  dirty: Arc<AtomicBool>,
+  dirty: Dirty,
 }
 
 impl From<Pulse> for Box<dyn Module> {
   fn from(spec: Pulse) -> Self {
-    let updater = Arc::new(AtomicBool::new(false));
-
-    UPDATERS.lock().push(Arc::downgrade(&updater));
-
-    Box::new(PulseModule { spec, text: None, dirty: updater })
+    Box::new(PulseModule { spec, text: None, dirty: UPDATERS.lock().add() })
   }
 }
 
 static STATE: Mutex<PulseState> = Mutex::new(PulseState { volume: 0 });
-static UPDATERS: Mutex<Vec<Weak<AtomicBool>>> = Mutex::new(vec![]);
+static UPDATERS: Mutex<UpdateGroup> = Mutex::new(UpdateGroup::new());
 
 struct PulseState {
   volume: u32,
@@ -620,14 +618,7 @@ fn set_callback(waker: &Arc<Waker>) {
       let w = waker.clone();
       context().get_sink_info_list(move |info| {
         STATE.lock().volume = info.volume().value_percents()[0];
-        UPDATERS.lock().retain_mut(|w| {
-          if let Some(a) = w.upgrade() {
-            a.store(true, Ordering::SeqCst);
-            true
-          } else {
-            false
-          }
-        });
+        UPDATERS.lock().mark_dirty();
         w.wake();
       });
     });
@@ -635,10 +626,10 @@ fn set_callback(waker: &Arc<Waker>) {
 }
 
 impl Module for PulseModule {
-  fn updater(&self) -> Updater<'_> { Updater::Atomic(&self.dirty) }
+  fn updater(&self) -> Updater<'_> { Updater::Atomic(self.dirty.get()) }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
     set_callback(layout.waker);
-    self.dirty.store(false, std::sync::atomic::Ordering::SeqCst);
+    self.dirty.clear();
 
     let mut text = Text::new();
     text.push(format_args!("{}", STATE.lock().volume), self.spec.primary);
