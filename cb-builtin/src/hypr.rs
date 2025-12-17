@@ -289,6 +289,10 @@ impl HyprState {
     }
 
     self.workspaces.sort_by(|a, b| a.name.cmp(&b.name));
+
+    if let Some(focused) = self.monitors.iter_mut().find(|m| m.focused) {
+      focused.active.id = id;
+    }
   }
 }
 
