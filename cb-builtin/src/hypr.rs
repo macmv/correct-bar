@@ -27,9 +27,12 @@ struct HyprModule {
 }
 
 struct WorkspaceLayout {
-  id:      u32,
-  text:    TextLayout,
+  id:   u32,
+  text: TextLayout,
+
   focused: bool,
+  /// True if this workspace is on the focused monitor.
+  active:  bool,
 }
 
 impl From<Hypr> for Box<dyn Module> {
@@ -117,6 +120,7 @@ struct HyprState {
 #[derive(serde::Deserialize)]
 struct Monitor {
   id:      u32,
+  name:    String,
   #[serde(rename = "activeWorkspace")]
   active:  ActiveWorkspace,
   focused: bool,
@@ -207,8 +211,9 @@ fn listen(waker: Arc<Waker>) {
         waker.wake();
       }
       "focusedmonv2" => {
-        let Some((_mon, workspace)) = args.split_once(',') else { continue };
+        let Some((mon, workspace)) = args.split_once(',') else { continue };
         let Ok(workspace) = workspace.parse::<u32>() else { continue };
+        STATE.lock().focus_monitor(mon);
         STATE.lock().focus_workspace(workspace);
         UPDATERS.lock().mark_dirty();
         waker.wake();
@@ -253,6 +258,11 @@ impl HyprState {
 
   fn destroy_workspace(&mut self, id: u32) { self.workspaces.retain(|w| w.id != id); }
 
+  fn focus_monitor(&mut self, name: &str) {
+    for monitor in &mut self.monitors {
+      monitor.focused = monitor.name == name;
+    }
+  }
   fn focus_workspace(&mut self, id: u32) {
     let mut found = false;
     for workspace in &mut self.workspaces {
@@ -303,6 +313,7 @@ impl Module for HyprModule {
         id:      workspace.id,
         text:    layout.layout_text(&workspace.name, color),
         focused: workspace.focused,
+        active:  state.monitors.iter().find(|m| m.active.id == workspace.id).is_some(),
       });
     }
 
@@ -324,7 +335,13 @@ impl Module for HyprModule {
     for workspace in &self.workspaces {
       ctx.draw_button(
         &workspace.text.bounds().inflate(5.0, 0.0),
-        if workspace.focused { self.spec.primary } else { self.spec.secondary },
+        if workspace.focused {
+          self.spec.primary
+        } else if workspace.active {
+          cb_core::oklch(0.6, 0.18, 283.76)
+        } else {
+          self.spec.secondary
+        },
       );
       ctx.draw(&workspace.text);
     }
