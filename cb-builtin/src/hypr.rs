@@ -7,7 +7,7 @@ use std::{
   sync::Arc,
 };
 
-use cb_bar::{Module, TextLayout};
+use cb_bar::{Animation, Module, TextLayout};
 use cb_core::{Color, Waker};
 use kurbo::Point;
 
@@ -29,6 +29,8 @@ struct HyprModule {
 struct WorkspaceLayout {
   id:   u32,
   text: TextLayout,
+
+  focus_animation: Animation,
 
   focused: bool,
   /// True if this workspace is on the focused monitor.
@@ -294,7 +296,7 @@ impl HyprState {
 
 impl Module for HyprModule {
   fn updater(&self) -> cb_bar::Updater<'_> {
-    if self.render_dirty.get() {
+    if self.render_dirty.get() || self.workspaces.iter().any(|w| w.focus_animation.is_running()) {
       cb_bar::Updater::Animation
     } else {
       cb_bar::Updater::Atomic(self.dirty.get())
@@ -311,19 +313,33 @@ impl Module for HyprModule {
 
     let state = STATE.lock();
 
-    self.workspaces.clear();
+    self.workspaces.retain(|w| state.workspaces.iter().find(|ws| ws.id == w.id).is_some());
+
     for (i, workspace) in state.workspaces.iter().enumerate() {
       if i != 0 {
         layout.pad(15.0);
       }
 
       let color = if workspace.focused { self.spec.primary } else { self.spec.secondary };
-      self.workspaces.push(WorkspaceLayout {
-        id:      workspace.id,
-        text:    layout.layout_text(&workspace.name, color),
-        focused: workspace.focused,
-        active:  state.monitors.iter().find(|m| m.active.id == workspace.id).is_some(),
-      });
+
+      if self.workspaces.get(i).is_none_or(|w| w.id != workspace.id) {
+        self.workspaces.insert(
+          i,
+          WorkspaceLayout {
+            id:              workspace.id,
+            text:            TextLayout::empty(),
+            focus_animation: Animation::ease_in(0.2),
+            focused:         false,
+            active:          false,
+          },
+        );
+      }
+
+      self.workspaces[i].text = layout.layout_text(&workspace.name, color);
+      self.workspaces[i].focused = workspace.focused;
+      self.workspaces[i].focus_animation.run(workspace.focused);
+      self.workspaces[i].active =
+        state.monitors.iter().find(|m| m.active.id == workspace.id).is_some();
     }
 
     layout.pad(10.0);
@@ -342,16 +358,29 @@ impl Module for HyprModule {
     self.render_dirty.set(false);
 
     for workspace in &self.workspaces {
+      workspace.focus_animation.advance(ctx.frame_time());
+
+      let target_color = if workspace.focused {
+        self.spec.primary
+      } else if workspace.active {
+        cb_core::oklch(0.6, 0.18, 283.76)
+      } else {
+        self.spec.secondary
+      };
+
       ctx.draw_button(
         &workspace.text.bounds().inflate(5.0, 0.0),
-        if workspace.focused {
-          self.spec.primary
-        } else if workspace.active {
-          cb_core::oklch(0.6, 0.18, 283.76)
+        if workspace.focus_animation.is_running() {
+          target_color.lerp(
+            self.spec.primary,
+            workspace.focus_animation.interpolate(0.0, 1.0) as f32,
+            peniko::color::HueDirection::Shorter,
+          )
         } else {
-          self.spec.secondary
+          target_color
         },
       );
+
       ctx.draw(&workspace.text);
     }
   }

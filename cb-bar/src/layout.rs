@@ -18,6 +18,12 @@ pub struct TextLayout {
   layout: parley::Layout<peniko::Brush>,
 }
 
+impl TextLayout {
+  pub fn empty() -> Self {
+    Self { origin: Point::new(0.0, 0.0), scale: 1.0, layout: parley::Layout::new() }
+  }
+}
+
 impl Layout<'_> {
   pub fn pad(&mut self, gap: f64) { self.bounds.x1 += gap; }
 
