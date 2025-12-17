@@ -27,7 +27,7 @@ struct HyprModule {
 }
 
 struct WorkspaceLayout {
-  id:      String,
+  id:      u32,
   text:    TextLayout,
   focused: bool,
 }
@@ -68,10 +68,26 @@ struct HyprState {
   workspaces: Vec<Workspace>,
 }
 
-#[derive(Clone)]
+/// ```json
+/// {
+///   "id": 2,
+///   "name": "2",
+///   "monitor": "DP-1",
+///   "monitorID": 0,
+///   "windows": 1,
+///   "hasfullscreen": false,
+///   "lastwindow": "window id, like 0x55",
+///   "lastwindowtitle": "title, like Steam",
+///   "ispersistent": false
+/// }
+/// ```
+
+#[derive(Clone, serde::Deserialize)]
 struct Workspace {
-  id:      String,
-  name:    String,
+  id:   u32,
+  name: String,
+
+  #[serde(skip)]
   focused: bool,
 }
 
@@ -117,18 +133,21 @@ fn listen(waker: Arc<Waker>) {
     match ev {
       "workspacev2" => {
         let Some((workspace, _name)) = args.split_once(',') else { continue };
+        let Ok(workspace) = workspace.parse::<u32>() else { continue };
         STATE.lock().focus_workspace(workspace);
         UPDATERS.lock().mark_dirty();
         waker.wake();
       }
       "destroyworkspacev2" => {
         let Some((workspace, _name)) = args.split_once(',') else { continue };
+        let Ok(workspace) = workspace.parse::<u32>() else { continue };
         STATE.lock().destroy_workspace(workspace);
         UPDATERS.lock().mark_dirty();
         waker.wake();
       }
       "focusedmonv2" => {
         let Some((_mon, workspace)) = args.split_once(',') else { continue };
+        let Ok(workspace) = workspace.parse::<u32>() else { continue };
         STATE.lock().focus_workspace(workspace);
         UPDATERS.lock().mark_dirty();
         waker.wake();
@@ -140,7 +159,7 @@ fn listen(waker: Arc<Waker>) {
 }
 
 impl Connection {
-  fn req(&self, req: &str) -> String {
+  fn req_str(&self, req: &str) -> String {
     let mut stream = UnixStream::connect(&self.request).unwrap();
 
     stream.write_all(req.as_bytes()).unwrap();
@@ -151,23 +170,13 @@ impl Connection {
     buf
   }
 
-  fn load_workspaces(&self) -> Vec<Workspace> {
-    let mut workspaces = vec![];
-
-    for line in self.req("workspaces").lines() {
-      // TODO: Parse json
-      if let Some(suffix) = line.strip_prefix("workspace ID ") {
-        let (id, _) = suffix.split_once(' ').unwrap();
-        workspaces.push(Workspace {
-          id:      id.to_string(),
-          name:    id.to_string(),
-          focused: false,
-        });
-      }
-    }
-
-    workspaces
+  fn req_json<T: serde::de::DeserializeOwned>(&self, req: &str) -> Vec<T> {
+    serde_json::from_str(&self.req_str(&format!("j/{req}"))).unwrap()
   }
+
+  pub fn dispatch(&self, req: &str) { self.req_str(&format!("dispatch {req}")); }
+
+  pub fn load_workspaces(&self) -> Vec<Workspace> { self.req_json("workspaces") }
 }
 
 impl HyprState {
@@ -181,9 +190,9 @@ impl HyprState {
     self.workspaces.sort_by(|a, b| a.name.cmp(&b.name));
   }
 
-  fn destroy_workspace(&mut self, id: &str) { self.workspaces.retain(|w| w.id != id); }
+  fn destroy_workspace(&mut self, id: u32) { self.workspaces.retain(|w| w.id != id); }
 
-  fn focus_workspace(&mut self, id: &str) {
+  fn focus_workspace(&mut self, id: u32) {
     let mut found = false;
     for workspace in &mut self.workspaces {
       workspace.focused = workspace.id == id;
@@ -191,11 +200,7 @@ impl HyprState {
     }
 
     if !found {
-      self.workspaces.push(Workspace {
-        id:      id.to_string(),
-        name:    id.to_string(),
-        focused: true,
-      });
+      self.workspaces.push(Workspace { id: id, name: id.to_string(), focused: true });
     }
 
     self.workspaces.sort_by(|a, b| a.name.cmp(&b.name));
@@ -229,7 +234,7 @@ impl Module for HyprModule {
 
       let color = if workspace.focused { self.spec.primary } else { self.spec.secondary };
       self.workspaces.push(WorkspaceLayout {
-        id:      workspace.id.clone(),
+        id:      workspace.id,
         text:    layout.layout_text(&workspace.name, color),
         focused: workspace.focused,
       });
@@ -241,8 +246,8 @@ impl Module for HyprModule {
   fn on_click(&mut self, cursor: Point) {
     for workspace in &self.workspaces {
       if workspace.text.bounds().inflate(5.0, 0.0).contains(cursor) {
-        Connection::from_env().req(&format!("dispatch workspace {}", workspace.id));
-        STATE.lock().focus_workspace(&workspace.id);
+        Connection::from_env().dispatch(&format!("workspace {}", workspace.id));
+        STATE.lock().focus_workspace(workspace.id);
       }
     }
   }
