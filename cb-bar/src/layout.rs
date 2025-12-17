@@ -13,9 +13,9 @@ pub struct Layout<'a> {
 }
 
 pub struct TextLayout {
-  origin: Point,
-  scale:  f64,
-  layout: parley::Layout<peniko::Brush>,
+  pub origin: Point,
+  pub scale:  f64,
+  pub layout: parley::Layout<peniko::Brush>,
 }
 
 impl TextLayout {
@@ -52,7 +52,9 @@ impl Layout<'_> {
 }
 
 impl Drawable for TextLayout {
-  fn draw(&self, ctx: &mut cb_core::Render) { ctx.draw_text_layout(self.origin, &self.layout); }
+  fn draw(&self, ctx: &mut cb_core::Render) {
+    ctx.draw_text_layout(self.origin, &self.layout, None);
+  }
 }
 
 impl TextLayout {

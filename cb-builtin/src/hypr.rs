@@ -320,8 +320,6 @@ impl Module for HyprModule {
         layout.pad(15.0);
       }
 
-      let color = if workspace.focused { self.spec.primary } else { self.spec.secondary };
-
       if self.workspaces.get(i).is_none_or(|w| w.id != workspace.id) {
         self.workspaces.insert(
           i,
@@ -335,7 +333,7 @@ impl Module for HyprModule {
         );
       }
 
-      self.workspaces[i].text = layout.layout_text(&workspace.name, color);
+      self.workspaces[i].text = layout.layout_text(&workspace.name, Color::BLACK);
       self.workspaces[i].focused = workspace.focused;
       self.workspaces[i].focus_animation.run(workspace.focused);
       self.workspaces[i].active =
@@ -368,20 +366,18 @@ impl Module for HyprModule {
         self.spec.secondary
       };
 
-      ctx.draw_button(
-        &workspace.text.bounds().inflate(5.0, 0.0),
-        if workspace.focus_animation.is_running() {
-          target_color.lerp(
-            self.spec.primary,
-            workspace.focus_animation.interpolate(0.0, 1.0) as f32,
-            peniko::color::HueDirection::Shorter,
-          )
-        } else {
-          target_color
-        },
-      );
+      let color = if workspace.focus_animation.is_running() {
+        target_color.lerp(
+          self.spec.primary,
+          workspace.focus_animation.interpolate(0.0, 1.0) as f32,
+          peniko::color::HueDirection::Shorter,
+        )
+      } else {
+        target_color
+      };
 
-      ctx.draw(&workspace.text);
+      ctx.draw_button(&workspace.text.bounds().inflate(5.0, 0.0), color);
+      ctx.draw_text_layout(workspace.text.origin, &workspace.text.layout, Some(color.into()));
     }
   }
 }

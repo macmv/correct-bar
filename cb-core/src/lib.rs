@@ -272,15 +272,18 @@ impl Render<'_> {
     layout.break_all_lines(None);
     layout.align(None, parley::Alignment::Start, parley::AlignmentOptions::default());
 
-    self.draw_text_layout(origin, &layout)
+    self.draw_text_layout(origin, &layout, None)
   }
 
   pub fn draw_text_layout(
     &mut self,
     origin: Point,
     layout: &parley::Layout<peniko::Brush>,
+    brush_override: Option<Brush>,
   ) -> Rect {
     let mut rect = Rect::new(0.0, 0.0, f64::from(layout.width()), f64::from(layout.height()));
+
+    let brush_override = brush_override.map(|brush| brush.encode());
 
     for line in layout.lines() {
       for item in line.items() {
@@ -294,7 +297,7 @@ impl Render<'_> {
         self
           .scene
           .draw_glyphs(run.font())
-          .brush(&glyph_run.style().brush)
+          .brush(brush_override.as_ref().unwrap_or(&glyph_run.style().brush))
           .hint(true)
           .transform(Affine::translate((origin.to_vec2() + self.offset) * self.scale))
           .glyph_transform(
