@@ -200,7 +200,12 @@ impl HyprState {
     }
 
     if !found {
-      self.workspaces.push(Workspace { id: id, name: id.to_string(), focused: true });
+      self.workspaces.clear();
+      self.workspaces = Connection::from_env().load_workspaces();
+
+      for workspace in &mut self.workspaces {
+        workspace.focused = workspace.id == id;
+      }
     }
 
     self.workspaces.sort_by(|a, b| a.name.cmp(&b.name));
