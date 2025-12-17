@@ -84,7 +84,8 @@ pub struct MemoryState {
 
 #[derive(Clone, Debug, Default)]
 pub struct CpuState {
-  pub usage: f64,
+  pub average: f64,
+  pub cpus:    Vec<f64>,
 }
 
 impl Files {
@@ -210,12 +211,20 @@ impl SystemInfo {
       } else {
         let elapsed = self.curr_state.time.duration_since(self.last_state.as_ref().unwrap().time);
         CpuState {
-          usage: {
+          average: {
             (self.curr_state.stat.average.total()
               - self.last_state.as_ref().unwrap().stat.average.total()) as f64
               / elapsed.as_secs_f64()
               / self.curr_state.stat.cpus.len() as f64
           },
+          cpus:    self
+            .curr_state
+            .stat
+            .cpus
+            .iter()
+            .zip(self.last_state.as_ref().unwrap().stat.cpus.iter())
+            .map(|(curr, last)| (curr.total() - last.total()) as f64 / elapsed.as_secs_f64())
+            .collect(),
         }
       },
     }
@@ -230,17 +239,28 @@ pub struct Cpu {
 struct CpuModule {
   spec: Cpu,
   text: Option<TextLayout>,
+
+  usage: Vec<f64>,
 }
 
 impl From<Cpu> for Box<dyn Module> {
-  fn from(spec: Cpu) -> Self { Box::new(CpuModule { spec, text: None }) }
+  fn from(spec: Cpu) -> Self { Box::new(CpuModule { spec, text: None, usage: vec![] }) }
+}
+
+const MAX_PER_COL: usize = 8;
+
+impl CpuModule {
+  fn cols(&self) -> usize { (self.usage.len() + MAX_PER_COL - 1) / MAX_PER_COL }
+  fn row_cols(&self) -> (usize, usize) {
+    let cols = self.cols();
+    let rows = (self.usage.len() + cols - 1) / cols;
+    (rows, cols)
+  }
 }
 
 impl Module for CpuModule {
   fn updater(&self) -> Updater<'_> { Updater::Every(Duration::from_secs(1)) }
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
-    layout.pad(5.0);
-
     SYS.with(|s| {
       let mut sys = s.borrow_mut();
       if sys.is_none() {
@@ -251,13 +271,15 @@ impl Module for CpuModule {
       let state = sys.state();
 
       let mut text = Text::new();
-      text.push(format_args!("{:>2.00}", state.cpu.usage), self.spec.primary);
+      text.push(format_args!("{:>2.00}", state.cpu.average), self.spec.primary);
       text.push("%", self.spec.secondary);
 
-      self.text = Some(layout.layout_text(text, self.spec.primary));
-    });
+      self.usage = state.cpu.cpus.clone();
 
-    layout.pad(5.0);
+      layout.pad(5.0 + 6.0 * self.cols() as f64);
+      self.text = Some(layout.layout_text(text, self.spec.primary));
+      layout.pad(5.0);
+    });
   }
   fn render(&self, ctx: &mut Render) {
     if let Some(text) = &self.text {
@@ -270,6 +292,35 @@ impl Module for CpuModule {
         ),
         self.spec.primary,
       );
+
+      let min_y = text.bounds().y0 - 5.0;
+      let max_y = text.bounds().y1 + 5.0;
+
+      if !self.usage.is_empty() {
+        let (rows, cols) = self.row_cols();
+        let delta = (max_y - min_y) / (rows - 1) as f64;
+
+        let mut cpu = 0;
+        'outer: for i in 0..cols {
+          for j in 0..rows {
+            let y = min_y + j as f64 * delta;
+
+            if cpu >= self.usage.len() {
+              break 'outer;
+            }
+
+            ctx.stroke(
+              &Line::new((i as f64 * 6.0, y), (i as f64 * 6.0 + 3.0, y)),
+              self.spec.secondary.lerp(
+                self.spec.primary,
+                (self.usage[cpu] / 100.0) as f32,
+                peniko::color::HueDirection::Shorter,
+              ),
+            );
+            cpu += 1;
+          }
+        }
+      }
     }
   }
 }
