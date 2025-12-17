@@ -199,22 +199,31 @@ fn listen(waker: Arc<Waker>) {
       "workspacev2" => {
         let Some((workspace, _name)) = args.split_once(',') else { continue };
         let Ok(workspace) = workspace.parse::<u32>() else { continue };
-        STATE.lock().focus_workspace(workspace);
+        {
+          let mut state = STATE.lock();
+          state.focus_workspace(workspace);
+        }
         UPDATERS.lock().mark_dirty();
         waker.wake();
       }
       "destroyworkspacev2" => {
         let Some((workspace, _name)) = args.split_once(',') else { continue };
         let Ok(workspace) = workspace.parse::<u32>() else { continue };
-        STATE.lock().destroy_workspace(workspace);
+        {
+          let mut state = STATE.lock();
+          state.destroy_workspace(workspace);
+        }
         UPDATERS.lock().mark_dirty();
         waker.wake();
       }
       "focusedmonv2" => {
         let Some((mon, workspace)) = args.split_once(',') else { continue };
         let Ok(workspace) = workspace.parse::<u32>() else { continue };
-        STATE.lock().focus_monitor(mon);
-        STATE.lock().focus_workspace(workspace);
+        {
+          let mut state = STATE.lock();
+          state.focus_monitor(mon);
+          state.focus_workspace(workspace);
+        }
         UPDATERS.lock().mark_dirty();
         waker.wake();
       }
