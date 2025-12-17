@@ -60,11 +60,71 @@ impl Connection {
   }
 }
 
-static STATE: Mutex<HyprState> = Mutex::new(HyprState { workspaces: vec![] });
+static STATE: Mutex<HyprState> = Mutex::new(HyprState { monitors: vec![], workspaces: vec![] });
 static UPDATERS: Mutex<UpdateGroup> = Mutex::new(UpdateGroup::new());
 
 struct HyprState {
+  monitors:   Vec<Monitor>,
   workspaces: Vec<Workspace>,
+}
+
+/// ```json
+/// {
+///   "id": 0,
+///   "name": "DP-1",
+///   "description": "Monitor Name",
+///   "make": "LG",
+///   "model": "Model",
+///   "serial": "Serial number",
+///   "width": 3840,
+///   "height": 2160,
+///   "physicalWidth": 610, // in mm
+///   "physicalHeight": 350, // in mm
+///   "refreshRate": 59.99700, // in Hz
+///   "x": 0,
+///   "y": 0,
+///   "activeWorkspace": {
+///     "id": 2,
+///     "name": "2"
+///   },
+///   "specialWorkspace": {
+///     "id": 0,
+///     "name": ""
+///   },
+///   "reserved": [0, 30, 0, 0], // reserved space (ie, bars)
+///   "scale": 2.00, // UI scale
+///   "transform": 0,
+///   "focused": true,
+///   "dpmsStatus": true,
+///   "vrr": false,
+///   "solitary": "0",
+///   "solitaryBlockedBy": ["WINDOWED", "CANDIDATE"],
+///   "activelyTearing": false,
+///   "tearingBlockedBy": ["NOT_TORN", "USER", "CANDIDATE"],
+///   "directScanoutTo": "0",
+///   "directScanoutBlockedBy": ["USER", "CANDIDATE"],
+///   "disabled": false,
+///   "currentFormat": "XRGB8888",
+///   "mirrorOf": "none",
+///   "availableModes": ["3840x2160@60.00Hz", "3840x2160@30.00Hz", etc],
+///   "colorManagementPreset": "srgb",
+///   "sdrBrightness": 1.00,
+///   "sdrSaturation": 1.00,
+///   "sdrMinLuminance": 0.20,
+///   "sdrMaxLuminance": 80
+/// }
+/// ```
+#[derive(serde::Deserialize)]
+struct Monitor {
+  id:      u32,
+  #[serde(rename = "activeWorkspace")]
+  active:  ActiveWorkspace,
+  focused: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct ActiveWorkspace {
+  id: u32,
 }
 
 /// ```json
@@ -80,11 +140,13 @@ struct HyprState {
 ///   "ispersistent": false
 /// }
 /// ```
-
 #[derive(serde::Deserialize)]
 struct Workspace {
   id:   u32,
   name: String,
+
+  #[serde(rename = "monitorID")]
+  monitor_id: u32,
 
   #[serde(skip)]
   focused: bool,
@@ -175,6 +237,7 @@ impl Connection {
 
   pub fn dispatch(&self, req: &str) { self.req_str(&format!("dispatch {req}")); }
 
+  pub fn load_monitors(&self) -> Vec<Monitor> { self.req_json("monitors") }
   pub fn load_workspaces(&self) -> Vec<Workspace> { self.req_json("workspaces") }
 }
 
@@ -182,9 +245,8 @@ impl HyprState {
   fn setup(&mut self) {
     let c = Connection::from_env();
 
-    for workspace in c.load_workspaces() {
-      self.workspaces.push(workspace);
-    }
+    self.monitors = c.load_monitors();
+    self.workspaces = c.load_workspaces();
 
     self.workspaces.sort_by(|a, b| a.name.cmp(&b.name));
   }
