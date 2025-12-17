@@ -63,7 +63,6 @@ impl Connection {
 static STATE: Mutex<HyprState> = Mutex::new(HyprState { workspaces: vec![] });
 static UPDATERS: Mutex<UpdateGroup> = Mutex::new(UpdateGroup::new());
 
-#[derive(Clone)]
 struct HyprState {
   workspaces: Vec<Workspace>,
 }
@@ -82,7 +81,7 @@ struct HyprState {
 /// }
 /// ```
 
-#[derive(Clone, serde::Deserialize)]
+#[derive(serde::Deserialize)]
 struct Workspace {
   id:   u32,
   name: String,
@@ -229,7 +228,7 @@ impl Module for HyprModule {
 
     layout.pad(10.0);
 
-    let state = STATE.lock().clone();
+    let state = STATE.lock();
 
     self.workspaces.clear();
     for (i, workspace) in state.workspaces.iter().enumerate() {
