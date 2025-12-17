@@ -1,14 +1,17 @@
+use parking_lot::Mutex;
 use std::{
   cell::RefCell,
   io::{BufRead, BufReader, Read, Write},
   os::unix::net::UnixStream,
   path::PathBuf,
-  sync::Mutex,
+  sync::Arc,
 };
 
 use cb_bar::{Module, TextLayout};
-use cb_core::Color;
+use cb_core::{Color, Waker};
 use kurbo::Point;
+
+use crate::{Dirty, UpdateGroup};
 
 #[derive(Clone)]
 pub struct Hypr {
@@ -19,6 +22,7 @@ pub struct Hypr {
 struct HyprModule {
   spec:       Hypr,
   workspaces: Vec<WorkspaceLayout>,
+  dirty:      Dirty,
 }
 
 struct WorkspaceLayout {
@@ -28,7 +32,9 @@ struct WorkspaceLayout {
 }
 
 impl From<Hypr> for Box<dyn Module> {
-  fn from(spec: Hypr) -> Self { Box::new(HyprModule { spec, workspaces: vec![] }) }
+  fn from(spec: Hypr) -> Self {
+    Box::new(HyprModule { spec, workspaces: vec![], dirty: UPDATERS.lock().add() })
+  }
 }
 
 thread_local! {
@@ -49,6 +55,7 @@ impl Connection {
 }
 
 static STATE: Mutex<HyprState> = Mutex::new(HyprState { workspaces: vec![] });
+static UPDATERS: Mutex<UpdateGroup> = Mutex::new(UpdateGroup::new());
 
 #[derive(Clone)]
 struct HyprState {
@@ -62,18 +69,19 @@ struct Workspace {
   focused: bool,
 }
 
-fn spawn_listener() {
+fn spawn_listener(waker: &Arc<Waker>) {
   use std::sync::atomic::*;
 
   static RUNNING: AtomicBool = AtomicBool::new(false);
 
   if !RUNNING.swap(true, Ordering::SeqCst) {
-    STATE.lock().unwrap().setup();
-    std::thread::spawn(listen);
+    STATE.lock().setup();
+    let waker = waker.clone();
+    std::thread::spawn(move || listen(waker));
   }
 }
 
-fn listen() {
+fn listen(waker: Arc<Waker>) {
   let sig = std::env::var("HYPRLAND_INSTANCE_SIGNATURE").unwrap();
   let runtime = std::env::var("XDG_RUNTIME_DIR").unwrap();
 
@@ -103,15 +111,21 @@ fn listen() {
     match ev {
       "workspacev2" => {
         let Some((workspace, _name)) = args.split_once(',') else { continue };
-        STATE.lock().unwrap().focus_workspace(workspace);
+        STATE.lock().focus_workspace(workspace);
+        UPDATERS.lock().mark_dirty();
+        waker.wake();
       }
       "destroyworkspacev2" => {
         let Some((workspace, _name)) = args.split_once(',') else { continue };
-        STATE.lock().unwrap().destroy_workspace(workspace);
+        STATE.lock().destroy_workspace(workspace);
+        UPDATERS.lock().mark_dirty();
+        waker.wake();
       }
       "focusedmonv2" => {
         let Some((_mon, workspace)) = args.split_once(',') else { continue };
-        STATE.lock().unwrap().focus_workspace(workspace);
+        STATE.lock().focus_workspace(workspace);
+        UPDATERS.lock().mark_dirty();
+        waker.wake();
       }
 
       _ => {}
@@ -183,14 +197,15 @@ impl HyprState {
 }
 
 impl Module for HyprModule {
-  fn updater(&self) -> cb_bar::Updater<'_> { cb_bar::Updater::None }
+  fn updater(&self) -> cb_bar::Updater<'_> { cb_bar::Updater::Atomic(self.dirty.get()) }
 
   fn layout(&mut self, layout: &mut cb_bar::Layout) {
-    spawn_listener();
+    spawn_listener(layout.waker);
+    self.dirty.clear();
 
     layout.pad(10.0);
 
-    let state = STATE.lock().unwrap().clone();
+    let state = STATE.lock().clone();
 
     self.workspaces.clear();
     for (i, workspace) in state.workspaces.iter().enumerate() {
@@ -213,7 +228,7 @@ impl Module for HyprModule {
     for workspace in &self.workspaces {
       if workspace.text.bounds().inflate(5.0, 0.0).contains(cursor) {
         Connection::from_env().req(&format!("dispatch workspace {}", workspace.id));
-        STATE.lock().unwrap().focus_workspace(&workspace.id);
+        STATE.lock().focus_workspace(&workspace.id);
       }
     }
   }
