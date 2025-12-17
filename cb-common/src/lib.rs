@@ -135,7 +135,7 @@ impl<A: App> Gpu<A> {
       format: surface_format,
       width,
       height,
-      present_mode: surface_caps.present_modes[0],
+      present_mode: wgpu::PresentMode::AutoVsync,
       alpha_mode: if surface_caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) {
         wgpu::CompositeAlphaMode::PreMultiplied
       } else {
