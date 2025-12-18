@@ -39,13 +39,9 @@ struct Monitor {
   surface:       Option<wl_surface::WlSurface>,
   layer_surface: Option<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1>,
 
-  // Logical position.
-  x: i32,
-  y: i32,
-
-  // Logical width/height.
-  width:  i32,
-  height: i32,
+  // width/height from zwlr layer surface (ie, logical size).
+  width:  u32,
+  height: u32,
 }
 
 impl<A: cb_common::App + 'static> AppData<A> {
@@ -102,16 +98,8 @@ impl<A> Dispatch<wl_output::WlOutput, ()> for AppData<A> {
     _: &Connection,
     _: &QueueHandle<Self>,
   ) {
-    let monitor = state.monitors.values_mut().find(|m| &m.output == output).unwrap();
+    let _monitor = state.monitors.values_mut().find(|m| &m.output == output).unwrap();
     match event {
-      wl_output::Event::Mode { width, height, .. } => {
-        monitor.width = width;
-        monitor.height = height;
-      }
-      wl_output::Event::Geometry { x, y, .. } => {
-        monitor.x = x;
-        monitor.y = y;
-      }
       wl_output::Event::Done => {
         println!("monitors: {:?}", state.monitors);
       }
@@ -162,10 +150,12 @@ impl<A: cb_common::App> Dispatch<wl_surface::WlSurface, BarId> for AppData<A> {
 
     match event {
       wl_surface::Event::PreferredBufferScale { factor } => {
+        let Some(monitor) = state.monitors.get_mut(id) else { return };
+
         let bar = state.gpu.bar_mut(*id).unwrap();
         if bar.scale != factor as f64 {
           bar.scale = factor as f64;
-          state.gpu.set_scale(*id, factor as f64);
+          state.gpu.set_size(*id, factor as f64, monitor.width, monitor.height);
 
           surface.set_buffer_scale(factor);
           surface.commit();
@@ -244,6 +234,8 @@ impl<A: cb_common::App> Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, BarI
       zwlr_layer_surface_v1::Event::Configure { serial, width, height } => {
         if let Some(monitor) = state.monitors.get_mut(id) {
           monitor.layer_surface.as_ref().unwrap().ack_configure(serial);
+          monitor.width = width;
+          monitor.height = height;
 
           unsafe {
             let raw_display = RawDisplayHandle::Wayland(WaylandDisplayHandle::new(
@@ -334,7 +326,7 @@ impl<A: cb_common::App> Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, Ba
         let bar = state.gpu.bar_mut(*id).unwrap();
         if bar.scale != scale {
           bar.scale = scale;
-          state.gpu.set_scale(*id, scale);
+          state.gpu.set_size(*id, scale, monitor.width, monitor.height);
 
           let integer_scale = scale.ceil() as i32;
           surface.set_buffer_scale(integer_scale);
@@ -425,8 +417,6 @@ impl<A: cb_common::App + 'static> Dispatch<wl_registry::WlRegistry, ()> for AppD
             output:        registry.bind(name, version, qh, ()),
             surface:       None,
             layer_surface: None,
-            x:             0,
-            y:             0,
             width:         0,
             height:        0,
           },

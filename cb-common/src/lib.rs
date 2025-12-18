@@ -181,13 +181,13 @@ impl<A: App> Gpu<A> {
     output.present();
   }
 
-  pub fn set_scale(&mut self, id: BarId, factor: f64) {
+  pub fn set_size(&mut self, id: BarId, scale: f64, width: u32, height: u32) {
     let Some(bar) = self.bars.get_mut(&id) else { return };
 
-    bar.surface_config.width = bar.surface_config.width * factor as u32;
-    bar.surface_config.height = bar.surface_config.height * factor as u32;
+    bar.surface_config.width = (width as f64 * scale) as u32;
+    bar.surface_config.height = (height as f64 * scale) as u32;
 
     bar.surface.configure(&self.device, &bar.surface_config);
-    self.app.set_scale(id, &self.device, factor);
+    self.app.set_scale(id, &self.device, scale);
   }
 }
