@@ -350,8 +350,15 @@ impl cb_core::App for App {
     }
   }
 
-  fn set_scale(&mut self, id: BarId, device: &cb_core::wgpu::Device, factor: f64) {
-    self.render.set_scale(id, device, factor);
+  fn set_size(
+    &mut self,
+    id: BarId,
+    device: &cb_core::wgpu::Device,
+    factor: f64,
+    width: u32,
+    height: u32,
+  ) {
+    self.render.set_size(id, device, factor, width, height);
     self.bars.get_mut(&id).unwrap().scale = factor as f64;
     self.bars.get_mut(&id).unwrap().force_dirty = true;
     self.bars.get_mut(&id).unwrap().layout(&mut self.render, &self.waker);

@@ -66,10 +66,10 @@ pub trait App {
     width: u32,
     height: u32,
   );
+  fn set_size(&mut self, id: BarId, device: &wgpu::Device, factor: f64, width: u32, height: u32);
   fn dirty(&self, id: BarId) -> bool;
   fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>);
   fn click_mouse(&mut self, id: BarId, pos: (f64, f64));
-  fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: f64);
   fn draw(&mut self, id: BarId, device: &wgpu::Device, queue: &wgpu::Queue, output: &wgpu::Texture);
 }
 
@@ -188,6 +188,6 @@ impl<A: App> Gpu<A> {
     bar.surface_config.height = (height as f64 * scale) as u32;
 
     bar.surface.configure(&self.device, &bar.surface_config);
-    self.app.set_scale(id, &self.device, scale);
+    self.app.set_size(id, &self.device, scale, width, height);
   }
 }

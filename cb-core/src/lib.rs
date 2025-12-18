@@ -109,15 +109,22 @@ impl RenderStore {
     self.bars.get_mut(&id).unwrap().cursor = pos.map(|(x, y)| Point::new(x as f64, y as f64));
   }
 
-  pub fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: f64) {
+  pub fn set_size(
+    &mut self,
+    id: BarId,
+    device: &wgpu::Device,
+    scale: f64,
+    width: u32,
+    height: u32,
+  ) {
     let bar = self.bars.get_mut(&id).unwrap();
-    bar.scale = factor;
+    bar.scale = scale;
 
     bar.texture = device.create_texture(&wgpu::TextureDescriptor {
       label:           None,
       size:            wgpu::Extent3d {
-        width:                 (bar.texture.width() as f64 * factor) as u32,
-        height:                (bar.texture.height() as f64 * factor) as u32,
+        width:                 (width as f64 * scale) as u32,
+        height:                (height as f64 * scale) as u32,
         depth_or_array_layers: 1,
       },
       mip_level_count: 1,
