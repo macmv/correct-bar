@@ -83,9 +83,9 @@ struct App {
 pub fn run(config: Config) { cb_backend_wayland::setup::<App>(config); }
 
 impl Bar {
-  fn into_layout(self, scale: f64) -> BarLayout {
+  fn into_layout(self, size: Size, scale: f64) -> BarLayout {
     BarLayout {
-      size: Size::new(1920.0, 30.0),
+      size,
       scale,
       last_draw: std::time::Instant::now(),
       force_dirty: true,
@@ -313,7 +313,8 @@ impl cb_core::App for App {
     width: u32,
     height: u32,
   ) {
-    let mut layout = (self.config.make_bar)().into_layout(f64::from(scale));
+    let mut layout = (self.config.make_bar)()
+      .into_layout(Size::new(f64::from(width), f64::from(height)), f64::from(scale));
     layout.layout(&mut self.render, &self.waker);
     self.bars.insert(id, layout);
 
@@ -359,8 +360,10 @@ impl cb_core::App for App {
     height: u32,
   ) {
     self.render.set_size(id, device, factor, width, height);
-    self.bars.get_mut(&id).unwrap().scale = factor as f64;
-    self.bars.get_mut(&id).unwrap().force_dirty = true;
-    self.bars.get_mut(&id).unwrap().layout(&mut self.render, &self.waker);
+    let bar = self.bars.get_mut(&id).unwrap();
+    bar.size = Size::new(f64::from(width), f64::from(height));
+    bar.scale = factor;
+    bar.force_dirty = true;
+    bar.layout(&mut self.render, &self.waker);
   }
 }
