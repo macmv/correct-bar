@@ -9,7 +9,10 @@ use wayland_client::{
   },
 };
 use wayland_protocols::{
-  wp::fractional_scale::v1::client::{wp_fractional_scale_manager_v1, wp_fractional_scale_v1},
+  wp::{
+    fractional_scale::v1::client::{wp_fractional_scale_manager_v1, wp_fractional_scale_v1},
+    viewporter::client::{wp_viewport, wp_viewporter},
+  },
   xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base},
 };
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
@@ -27,6 +30,7 @@ struct AppData<A> {
   compositor:       Option<wl_compositor::WlCompositor>,
   seat:             Option<wl_seat::WlSeat>,
   shell:            Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
+  viewporter:       Option<wp_viewporter::WpViewporter>,
   fractional_scale: Option<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
 
   pointer_surface: Option<wl_surface::WlSurface>,
@@ -37,6 +41,7 @@ struct Monitor {
   output: wl_output::WlOutput,
 
   surface:       Option<wl_surface::WlSurface>,
+  viewport:      Option<wp_viewport::WpViewport>,
   layer_surface: Option<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1>,
 
   // width/height from zwlr layer surface (ie, logical size).
@@ -48,10 +53,13 @@ impl<A: cb_common::App + 'static> AppData<A> {
   fn on_change(&mut self, qh: &QueueHandle<AppData<A>>) {
     if let Some(shell) = &self.shell
       && let Some(compositor) = &self.compositor
+      && let Some(viewporter) = &self.viewporter
     {
       for (id, monitor) in &mut self.monitors {
         if monitor.surface.is_none() {
           monitor.surface = Some(compositor.create_surface(qh, *id));
+          monitor.viewport =
+            Some(viewporter.get_viewport(&monitor.surface.as_ref().unwrap(), qh, ()));
 
           if let Some(scale) = &self.fractional_scale {
             scale.get_fractional_scale(monitor.surface.as_ref().unwrap(), qh, *id);
@@ -305,6 +313,18 @@ impl<A> Dispatch<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1, ()>
   }
 }
 
+impl<A> Dispatch<wp_viewporter::WpViewporter, ()> for AppData<A> {
+  fn event(
+    _: &mut Self,
+    _: &wp_viewporter::WpViewporter,
+    _: wp_viewporter::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<Self>,
+  ) {
+  }
+}
+
 impl<A: cb_common::App> Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, BarId>
   for AppData<A>
 {
@@ -321,16 +341,14 @@ impl<A: cb_common::App> Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, Ba
         let scale = scale as f64 / 120.0;
 
         let Some(monitor) = state.monitors.get_mut(id) else { return };
-        let Some(surface) = monitor.surface.as_ref() else { return };
+        let Some(viewport) = monitor.viewport.as_ref() else { return };
 
         let bar = state.gpu.bar_mut(*id).unwrap();
         if bar.scale != scale {
           bar.scale = scale;
           state.gpu.set_size(*id, scale, monitor.width, monitor.height);
 
-          let integer_scale = scale.ceil() as i32;
-          surface.set_buffer_scale(integer_scale);
-          surface.commit();
+          viewport.set_destination(monitor.width as i32, monitor.height as i32);
           state.gpu.render_bar(*id);
         }
 
@@ -338,6 +356,18 @@ impl<A: cb_common::App> Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, Ba
       }
       _ => {}
     }
+  }
+}
+
+impl<A: cb_common::App> Dispatch<wp_viewport::WpViewport, ()> for AppData<A> {
+  fn event(
+    _: &mut Self,
+    _: &wp_viewport::WpViewport,
+    _: wp_viewport::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<Self>,
+  ) {
   }
 }
 
@@ -416,6 +446,7 @@ impl<A: cb_common::App + 'static> Dispatch<wl_registry::WlRegistry, ()> for AppD
           Monitor {
             output:        registry.bind(name, version, qh, ()),
             surface:       None,
+            viewport:      None,
             layer_surface: None,
             width:         0,
             height:        0,
@@ -428,6 +459,8 @@ impl<A: cb_common::App + 'static> Dispatch<wl_registry::WlRegistry, ()> for AppD
         state.seat.as_ref().unwrap().get_pointer(qh, ());
       } else if interface == zwlr_layer_shell_v1::ZwlrLayerShellV1::interface().name {
         state.shell = Some(registry.bind(name, version, qh, ()));
+      } else if interface == wp_viewporter::WpViewporter::interface().name {
+        state.viewporter = Some(registry.bind(name, version, qh, ()));
       } else if interface
         == wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1::interface().name
       {
@@ -454,6 +487,7 @@ pub fn setup<A: cb_common::App + 'static>(config: A::Config) {
     compositor:       None,
     shell:            None,
     seat:             None,
+    viewporter:       None,
     fractional_scale: None,
     display:          None,
     pointer_surface:  None,
