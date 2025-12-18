@@ -309,7 +309,7 @@ impl cb_core::App for App {
     id: BarId,
     device: &cb_core::wgpu::Device,
     format: cb_core::wgpu::TextureFormat,
-    scale: f32,
+    scale: f64,
     width: u32,
     height: u32,
   ) {
@@ -350,7 +350,7 @@ impl cb_core::App for App {
     }
   }
 
-  fn set_scale(&mut self, id: BarId, device: &cb_core::wgpu::Device, factor: i32) {
+  fn set_scale(&mut self, id: BarId, device: &cb_core::wgpu::Device, factor: f64) {
     self.render.set_scale(id, device, factor);
     self.bars.get_mut(&id).unwrap().scale = factor as f64;
     self.bars.get_mut(&id).unwrap().force_dirty = true;

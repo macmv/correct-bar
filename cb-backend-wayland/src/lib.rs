@@ -8,7 +8,10 @@ use wayland_client::{
     wl_shm_pool, wl_surface,
   },
 };
-use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
+use wayland_protocols::{
+  wp::fractional_scale::v1::client::{wp_fractional_scale_manager_v1, wp_fractional_scale_v1},
+  xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base},
+};
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 use wgpu::{
   SurfaceTargetUnsafe,
@@ -21,9 +24,10 @@ struct AppData<A> {
   display:  Option<wl_display::WlDisplay>,
   monitors: HashMap<BarId, Monitor>,
 
-  compositor: Option<wl_compositor::WlCompositor>,
-  seat:       Option<wl_seat::WlSeat>,
-  shell:      Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
+  compositor:       Option<wl_compositor::WlCompositor>,
+  seat:             Option<wl_seat::WlSeat>,
+  shell:            Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
+  fractional_scale: Option<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1>,
 
   pointer_surface: Option<wl_surface::WlSurface>,
 }
@@ -52,6 +56,10 @@ impl<A: cb_common::App + 'static> AppData<A> {
       for (id, monitor) in &mut self.monitors {
         if monitor.surface.is_none() {
           monitor.surface = Some(compositor.create_surface(qh, *id));
+
+          if let Some(scale) = &self.fractional_scale {
+            scale.get_fractional_scale(monitor.surface.as_ref().unwrap(), qh, *id);
+          }
         }
 
         if monitor.layer_surface.is_none() {
@@ -147,12 +155,17 @@ impl<A: cb_common::App> Dispatch<wl_surface::WlSurface, BarId> for AppData<A> {
     _: &Connection,
     _: &QueueHandle<Self>,
   ) {
+    // Prefer fractional scales when available.
+    if state.fractional_scale.is_some() {
+      return;
+    }
+
     match event {
       wl_surface::Event::PreferredBufferScale { factor } => {
         let bar = state.gpu.bar_mut(*id).unwrap();
-        if bar.scale != factor as f32 {
-          bar.scale = factor as f32;
-          state.gpu.set_scale(*id, factor);
+        if bar.scale != factor as f64 {
+          bar.scale = factor as f64;
+          state.gpu.set_scale(*id, factor as f64);
 
           surface.set_buffer_scale(factor);
           surface.commit();
@@ -288,6 +301,52 @@ impl<A> Dispatch<wl_seat::WlSeat, ()> for AppData<A> {
   }
 }
 
+impl<A> Dispatch<wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1, ()> for AppData<A> {
+  fn event(
+    _: &mut Self,
+    _: &wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1,
+    _: wp_fractional_scale_manager_v1::Event,
+    _: &(),
+    _: &Connection,
+    _: &QueueHandle<Self>,
+  ) {
+  }
+}
+
+impl<A: cb_common::App> Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, BarId>
+  for AppData<A>
+{
+  fn event(
+    state: &mut Self,
+    _: &wp_fractional_scale_v1::WpFractionalScaleV1,
+    event: wp_fractional_scale_v1::Event,
+    id: &BarId,
+    _: &Connection,
+    _: &QueueHandle<Self>,
+  ) {
+    match event {
+      wp_fractional_scale_v1::Event::PreferredScale { scale } => {
+        let scale = scale as f64 / 120.0;
+
+        let Some(monitor) = state.monitors.get_mut(id) else { return };
+        let Some(surface) = monitor.surface.as_ref() else { return };
+
+        let bar = state.gpu.bar_mut(*id).unwrap();
+        if bar.scale != scale {
+          bar.scale = scale;
+          state.gpu.set_scale(*id, scale);
+
+          surface.commit();
+          state.gpu.render_bar(*id);
+        }
+
+        println!("fractional scale: {scale}");
+      }
+      _ => {}
+    }
+  }
+}
+
 impl<A: cb_common::App> Dispatch<wl_pointer::WlPointer, ()> for AppData<A> {
   fn event(
     state: &mut Self,
@@ -377,6 +436,10 @@ impl<A: cb_common::App + 'static> Dispatch<wl_registry::WlRegistry, ()> for AppD
         state.seat.as_ref().unwrap().get_pointer(qh, ());
       } else if interface == zwlr_layer_shell_v1::ZwlrLayerShellV1::interface().name {
         state.shell = Some(registry.bind(name, version, qh, ()));
+      } else if interface
+        == wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1::interface().name
+      {
+        state.fractional_scale = Some(registry.bind(name, version, qh, ()));
       }
 
       state.on_change(qh);
@@ -394,13 +457,14 @@ pub fn setup<A: cb_common::App + 'static>(config: A::Config) {
   display.get_registry(&qh, ());
 
   let mut app = AppData {
-    gpu:             Gpu::<A>::new(config),
-    monitors:        HashMap::new(),
-    compositor:      None,
-    shell:           None,
-    seat:            None,
-    display:         None,
-    pointer_surface: None,
+    gpu:              Gpu::<A>::new(config),
+    monitors:         HashMap::new(),
+    compositor:       None,
+    shell:            None,
+    seat:             None,
+    fractional_scale: None,
+    display:          None,
+    pointer_surface:  None,
   };
   app.display = Some(display);
 

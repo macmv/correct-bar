@@ -32,7 +32,7 @@ pub struct RenderStore {
 }
 
 struct Bar {
-  scale:        f32,
+  scale:        f64,
   blitter:      TextureBlitterConvert,
   texture:      wgpu::Texture,
   texture_view: wgpu::TextureView,
@@ -67,7 +67,7 @@ impl RenderStore {
     id: BarId,
     device: &wgpu::Device,
     surface_format: wgpu::TextureFormat,
-    scale: f32,
+    scale: f64,
     width: u32,
     height: u32,
   ) {
@@ -109,15 +109,15 @@ impl RenderStore {
     self.bars.get_mut(&id).unwrap().cursor = pos.map(|(x, y)| Point::new(x as f64, y as f64));
   }
 
-  pub fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: i32) {
+  pub fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: f64) {
     let bar = self.bars.get_mut(&id).unwrap();
-    bar.scale = factor as f32;
+    bar.scale = factor;
 
     bar.texture = device.create_texture(&wgpu::TextureDescriptor {
       label:           None,
       size:            wgpu::Extent3d {
-        width:                 bar.texture.width() * factor as u32,
-        height:                bar.texture.height() * factor as u32,
+        width:                 (bar.texture.width() as f64 * factor) as u32,
+        height:                (bar.texture.height() as f64 * factor) as u32,
         depth_or_array_layers: 1,
       },
       mip_level_count: 1,
