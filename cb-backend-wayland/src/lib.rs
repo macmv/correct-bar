@@ -336,6 +336,8 @@ impl<A: cb_common::App> Dispatch<wp_fractional_scale_v1::WpFractionalScaleV1, Ba
           bar.scale = scale;
           state.gpu.set_scale(*id, scale);
 
+          let integer_scale = scale.ceil() as i32;
+          surface.set_buffer_scale(integer_scale);
           surface.commit();
           state.gpu.render_bar(*id);
         }
