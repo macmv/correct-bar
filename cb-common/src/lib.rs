@@ -62,14 +62,14 @@ pub trait App {
     id: BarId,
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
-    scale: f32,
+    scale: f64,
     width: u32,
     height: u32,
   );
+  fn set_size(&mut self, id: BarId, device: &wgpu::Device, factor: f64, width: u32, height: u32);
   fn dirty(&self, id: BarId) -> bool;
   fn move_mouse(&mut self, id: BarId, pos: Option<(f64, f64)>);
   fn click_mouse(&mut self, id: BarId, pos: (f64, f64));
-  fn set_scale(&mut self, id: BarId, device: &wgpu::Device, factor: i32);
   fn draw(&mut self, id: BarId, device: &wgpu::Device, queue: &wgpu::Queue, output: &wgpu::Texture);
 }
 
@@ -80,7 +80,7 @@ pub struct Bar {
   surface:        wgpu::Surface<'static>,
   surface_config: wgpu::SurfaceConfiguration,
 
-  pub scale: f32,
+  pub scale: f64,
 }
 
 impl BarId {
@@ -114,7 +114,7 @@ impl<A: App> Gpu<A> {
     &mut self,
     id: BarId,
     surface: wgpu::Surface<'static>,
-    scale: f32,
+    scale: f64,
     width: u32,
     height: u32,
   ) {
@@ -181,13 +181,13 @@ impl<A: App> Gpu<A> {
     output.present();
   }
 
-  pub fn set_scale(&mut self, id: BarId, factor: i32) {
+  pub fn set_size(&mut self, id: BarId, scale: f64, width: u32, height: u32) {
     let Some(bar) = self.bars.get_mut(&id) else { return };
 
-    bar.surface_config.width = bar.surface_config.width * factor as u32;
-    bar.surface_config.height = bar.surface_config.height * factor as u32;
+    bar.surface_config.width = (width as f64 * scale) as u32;
+    bar.surface_config.height = (height as f64 * scale) as u32;
 
     bar.surface.configure(&self.device, &bar.surface_config);
-    self.app.set_scale(id, &self.device, factor);
+    self.app.set_size(id, &self.device, scale, width, height);
   }
 }
