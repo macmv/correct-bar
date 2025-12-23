@@ -224,7 +224,7 @@ impl SystemInfo {
             .collect(),
         }
       } else {
-        CpuState::default()
+        CpuState { average: 0.0, cpus: vec![0.0; self.curr_state.stat.cpus.len()] }
       },
     }
   }
