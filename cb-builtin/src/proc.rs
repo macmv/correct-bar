@@ -206,14 +206,11 @@ impl SystemInfo {
         avail_mb: self.curr_state.meminfo.mem_avail_kb / 1024,
       },
       // Our readings will be bad for the first lookup, which is fine.
-      cpu:    if self.last_state.is_none() {
-        CpuState::default()
-      } else {
-        let elapsed = self.curr_state.time.duration_since(self.last_state.as_ref().unwrap().time);
+      cpu:    if let Some(last) = &self.last_state {
+        let elapsed = self.curr_state.time.duration_since(last.time);
         CpuState {
           average: {
-            (self.curr_state.stat.average.total()
-              - self.last_state.as_ref().unwrap().stat.average.total()) as f64
+            (self.curr_state.stat.average.total() - last.stat.average.total()) as f64
               / elapsed.as_secs_f64()
               / self.curr_state.stat.cpus.len() as f64
           },
@@ -222,10 +219,12 @@ impl SystemInfo {
             .stat
             .cpus
             .iter()
-            .zip(self.last_state.as_ref().unwrap().stat.cpus.iter())
+            .zip(last.stat.cpus.iter())
             .map(|(curr, last)| (curr.total() - last.total()) as f64 / elapsed.as_secs_f64())
             .collect(),
         }
+      } else {
+        CpuState::default()
       },
     }
   }
